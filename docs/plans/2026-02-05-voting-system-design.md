@@ -1,6 +1,30 @@
 # Group Vote — Anesthesia Group Voting System
 
-## Overview
+## What Is This?
+
+Group Vote is a private website built for our anesthesia group to vote on things together — scheduling changes, policy decisions, leadership elections, financial matters, and anything else the group needs to weigh in on.
+
+**How it works in plain terms:**
+
+1. **You get an email with a link.** When there's something to vote on, you'll receive an email. Tap the link and you're in — no password to remember, no app to download.
+
+2. **You vote.** Depending on the topic, you might vote yes/no, pick from a list, or rank your preferences. It takes about 30 seconds.
+
+3. **You can change your mind.** Not sure yet? Vote now and change it later before the deadline. Only your final answer counts.
+
+4. **Your vote can be private.** For sensitive topics (like personnel decisions or elections), votes are fully anonymous — nobody, not even the admin, can see who voted for what. For less sensitive topics, votes can be open.
+
+5. **You get reminded.** If you haven't voted and the deadline is approaching, you'll get a friendly nudge. No more "I forgot to fill out that form."
+
+6. **Results are clear.** When voting closes, everyone sees the outcome: what passed, what didn't, and whether enough people voted for it to count.
+
+**Why not just use Google Forms?** Google Forms can't guarantee one-person-one-vote, can't do anonymous-but-verified voting, doesn't support ranked choice, and has no way to track participation or enforce quorum rules. This system is purpose-built for group governance, not just surveys. (See the detailed comparison below.)
+
+**Who runs it?** An admin (or small group of admins) manages the member list and approves votes before they go live. Any group member can propose a topic for a vote.
+
+---
+
+## Technical Overview
 
 A web-based voting system for a ~35-40 member anesthesia group to make collective decisions on policy, financial, personnel, and governance matters. The system prioritizes participation, vote privacy, and integrity (one person, one vote).
 
