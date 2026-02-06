@@ -10,6 +10,15 @@ export interface CreateVoteState {
   fieldErrors: Record<string, string>;
 }
 
+// Formats that use standard option_label_N fields
+const STANDARD_OPTION_FORMATS: VoteFormat[] = [
+  "multiple_choice",
+  "ranked_choice",
+  "approval",
+  "score_rating",
+  "multi_select",
+];
+
 export async function createVote(
   _prevState: CreateVoteState,
   formData: FormData
@@ -27,18 +36,37 @@ export async function createVote(
     : null;
   const deadlineStr = (formData.get("deadline") as string) || null;
 
-  // Parse options from dynamic fields
+  // Parse options from dynamic fields (standard text options)
   const options: { label: string; description: string | null }[] = [];
-  let i = 0;
-  while (formData.has(`option_label_${i}`)) {
-    const label = (formData.get(`option_label_${i}`) as string)?.trim();
-    const optDesc =
-      (formData.get(`option_description_${i}`) as string)?.trim() || null;
-    if (label) {
-      options.push({ label, description: optDesc });
+  if (STANDARD_OPTION_FORMATS.includes(format)) {
+    let i = 0;
+    while (formData.has(`option_label_${i}`)) {
+      const label = (formData.get(`option_label_${i}`) as string)?.trim();
+      const optDesc =
+        (formData.get(`option_description_${i}`) as string)?.trim() || null;
+      if (label) {
+        options.push({ label, description: optDesc });
+      }
+      i++;
     }
-    i++;
   }
+
+  // Parse date options for date_poll
+  const dateOptions: string[] = [];
+  if (format === "date_poll") {
+    let i = 0;
+    while (formData.has(`option_date_${i}`)) {
+      const dateVal = (formData.get(`option_date_${i}`) as string)?.trim();
+      if (dateVal) {
+        dateOptions.push(dateVal);
+      }
+      i++;
+    }
+  }
+
+  // Parse max_selections for multi_select
+  const maxSelectionsStr = formData.get("max_selections") as string | null;
+  const maxSelections = maxSelectionsStr ? parseInt(maxSelectionsStr, 10) : 3;
 
   // Validation
   const fieldErrors: Record<string, string> = {};
@@ -60,14 +88,23 @@ export async function createVote(
       "Custom threshold must be between 1 and 100.";
   }
 
-  if (format === "yes_no") {
-    // Auto-populate
+  // Format-specific option validation
+  if (format === "yes_no" || format === "rsvp") {
+    // Auto-populated — no user options needed
+  } else if (format === "date_poll") {
+    if (dateOptions.length < 2) {
+      fieldErrors.options = "At least 2 date/time options are required.";
+    }
   } else if (options.length < 2) {
     fieldErrors.options = "At least 2 options are required.";
   }
 
   if (format === "ranked_choice" && options.length < 3) {
     fieldErrors.options = "Ranked choice requires at least 3 options.";
+  }
+
+  if (format === "multi_select" && (isNaN(maxSelections) || maxSelections < 1)) {
+    fieldErrors.max_selections = "Maximum selections must be at least 1.";
   }
 
   if (Object.keys(fieldErrors).length > 0) {
@@ -101,18 +138,50 @@ export async function createVote(
     };
   }
 
-  const optionsToInsert =
-    format === "yes_no"
-      ? [
-          { vote_id: vote.id, label: "Yes", display_order: 0 },
-          { vote_id: vote.id, label: "No", display_order: 1 },
-        ]
-      : options.map((opt, idx) => ({
-          vote_id: vote.id,
-          label: opt.label,
-          description: opt.description,
-          display_order: idx,
-        }));
+  // Build options to insert based on format
+  let optionsToInsert: {
+    vote_id: string;
+    label: string;
+    description?: string | null;
+    display_order: number;
+  }[];
+
+  if (format === "yes_no") {
+    optionsToInsert = [
+      { vote_id: vote.id, label: "Yes", display_order: 0 },
+      { vote_id: vote.id, label: "No", display_order: 1 },
+    ];
+  } else if (format === "rsvp") {
+    optionsToInsert = [
+      { vote_id: vote.id, label: "Going", display_order: 0 },
+      { vote_id: vote.id, label: "Not Going", display_order: 1 },
+      { vote_id: vote.id, label: "Maybe", display_order: 2 },
+    ];
+  } else if (format === "date_poll") {
+    optionsToInsert = dateOptions.map((dateVal, idx) => ({
+      vote_id: vote.id,
+      label: dateVal,
+      display_order: idx,
+    }));
+  } else {
+    // multiple_choice, ranked_choice, approval, score_rating, multi_select
+    optionsToInsert = options.map((opt, idx) => ({
+      vote_id: vote.id,
+      label: opt.label,
+      description: opt.description,
+      display_order: idx,
+    }));
+  }
+
+  // For multi_select, append a hidden config option to store max_selections
+  if (format === "multi_select") {
+    optionsToInsert.push({
+      vote_id: vote.id,
+      label: "__max_selections__",
+      description: String(maxSelections),
+      display_order: 9999,
+    });
+  }
 
   const { error: optionsError } = await adminClient
     .from("vote_options")

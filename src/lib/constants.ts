@@ -13,6 +13,11 @@ export const VOTE_FORMAT_LABELS: Record<string, string> = {
   yes_no: "Yes / No",
   multiple_choice: "Multiple Choice",
   ranked_choice: "Ranked Choice",
+  date_poll: "Date Poll",
+  approval: "Approval Voting",
+  rsvp: "RSVP / Attendance",
+  score_rating: "Score / Rating",
+  multi_select: "Multi-Select (Pick N)",
 };
 
 export const PRIVACY_LEVEL_LABELS: Record<string, string> = {

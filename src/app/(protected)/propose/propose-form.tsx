@@ -12,6 +12,15 @@ import type { VoteFormat } from "@/lib/types";
 
 const initialState: ProposeVoteState = { error: null, fieldErrors: {} };
 
+// Formats that show standard text option inputs
+const FORMATS_WITH_OPTIONS: VoteFormat[] = [
+  "multiple_choice",
+  "ranked_choice",
+  "approval",
+  "score_rating",
+  "multi_select",
+];
+
 export function ProposeForm() {
   const [state, formAction, isPending] = useActionState(
     proposeVote,
@@ -23,6 +32,8 @@ export function ProposeForm() {
     { label: "", description: "" },
     { label: "", description: "" },
   ]);
+  const [dateOptions, setDateOptions] = useState(["", ""]);
+  const [maxSelections, setMaxSelections] = useState(3);
 
   function addOption() {
     setOptions([...options, { label: "", description: "" }]);
@@ -33,7 +44,18 @@ export function ProposeForm() {
     setOptions(options.filter((_, i) => i !== index));
   }
 
-  const showOptions = format !== "yes_no";
+  function addDateOption() {
+    setDateOptions([...dateOptions, ""]);
+  }
+
+  function removeDateOption(index: number) {
+    if (dateOptions.length <= 2) return;
+    setDateOptions(dateOptions.filter((_, i) => i !== index));
+  }
+
+  const showOptions = FORMATS_WITH_OPTIONS.includes(format);
+  const showDateOptions = format === "date_poll";
+  const isRsvp = format === "rsvp";
 
   return (
     <form action={formAction} className="space-y-6">
@@ -111,7 +133,43 @@ export function ProposeForm() {
         )}
       </div>
 
-      {/* Options (only for multiple_choice and ranked_choice) */}
+      {/* RSVP hint — no options needed */}
+      {isRsvp && (
+        <div className="rounded-lg bg-blue-50 px-4 py-3 text-sm text-blue-700">
+          RSVP options (Going, Not Going, Maybe) will be created automatically.
+        </div>
+      )}
+
+      {/* Max selections for multi_select — shown above options */}
+      {format === "multi_select" && (
+        <div>
+          <label
+            htmlFor="max_selections"
+            className="block text-sm font-medium text-gray-700"
+          >
+            Maximum Selections *
+          </label>
+          <input
+            id="max_selections"
+            name="max_selections"
+            type="number"
+            min={1}
+            value={maxSelections}
+            onChange={(e) => setMaxSelections(parseInt(e.target.value, 10) || 1)}
+            className="mt-1 block w-32 rounded-lg border border-gray-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+          />
+          <p className="mt-1 text-xs text-gray-500">
+            How many options each voter can select.
+          </p>
+          {state.fieldErrors.max_selections && (
+            <p className="mt-1 text-sm text-red-600">
+              {state.fieldErrors.max_selections}
+            </p>
+          )}
+        </div>
+      )}
+
+      {/* Standard text options: multiple_choice, ranked_choice, approval, score_rating, multi_select */}
       {showOptions && (
         <div>
           <label className="block text-sm font-medium text-gray-700">
@@ -157,6 +215,54 @@ export function ProposeForm() {
             className="mt-2 text-sm font-medium text-blue-600 hover:text-blue-800"
           >
             + Add option
+          </button>
+          {state.fieldErrors.options && (
+            <p className="mt-1 text-sm text-red-600">
+              {state.fieldErrors.options}
+            </p>
+          )}
+        </div>
+      )}
+
+      {/* Date/time options for date_poll */}
+      {showDateOptions && (
+        <div>
+          <label className="block text-sm font-medium text-gray-700">
+            Date/Time Options *
+          </label>
+          <div className="mt-2 space-y-3">
+            {dateOptions.map((dt, idx) => (
+              <div key={idx} className="flex gap-2 items-center">
+                <div className="flex-1">
+                  <label className="block text-xs text-gray-500 mb-1">
+                    Date/Time option {idx + 1}
+                  </label>
+                  <input
+                    name={`option_date_${idx}`}
+                    type="datetime-local"
+                    required
+                    defaultValue={dt}
+                    className="block w-full rounded-lg border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                  />
+                </div>
+                {dateOptions.length > 2 && (
+                  <button
+                    type="button"
+                    onClick={() => removeDateOption(idx)}
+                    className="rounded-lg px-2 py-2 text-sm text-red-600 hover:bg-red-50 self-end"
+                  >
+                    Remove
+                  </button>
+                )}
+              </div>
+            ))}
+          </div>
+          <button
+            type="button"
+            onClick={addDateOption}
+            className="mt-2 text-sm font-medium text-blue-600 hover:text-blue-800"
+          >
+            + Add date/time option
           </button>
           {state.fieldErrors.options && (
             <p className="mt-1 text-sm text-red-600">

@@ -1,7 +1,16 @@
 import { getCurrentMember } from "@/lib/auth";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { notFound } from "next/navigation";
-import { tallyVote, type VoteResult, type RankedChoiceResult } from "@/lib/tallying";
+import {
+  tallyVote,
+  type VoteResult,
+  type RankedChoiceResult,
+  type DatePollResult,
+  type ApprovalResult,
+  type RsvpResult,
+  type ScoreRatingResult,
+  type MultiSelectResult,
+} from "@/lib/tallying";
 import {
   getResultStatus,
   getResultExplanation,
@@ -283,6 +292,347 @@ export default async function ResultsPage({
           ))}
         </div>
       )}
+
+      {/* Date Poll — table with Yes/No/Maybe columns */}
+      {result.format === "date_poll" && (() => {
+        const datePollResult = result as DatePollResult;
+        return (
+          <div className="rounded-lg border bg-white p-5">
+            <h2 className="text-lg font-semibold text-gray-900">
+              Date Poll Results
+            </h2>
+            <p className="mt-1 text-sm text-gray-500">
+              {datePollResult.totalBallots} response
+              {datePollResult.totalBallots !== 1 ? "s" : ""} received
+            </p>
+            <div className="mt-4 overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b text-left">
+                    <th className="pb-2 pr-4 font-medium text-gray-700">
+                      Date
+                    </th>
+                    <th className="pb-2 px-4 text-center font-medium text-green-700">
+                      Yes
+                    </th>
+                    <th className="pb-2 px-4 text-center font-medium text-yellow-700">
+                      Maybe
+                    </th>
+                    <th className="pb-2 pl-4 text-center font-medium text-red-700">
+                      No
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {datePollResult.options.map((opt) => {
+                    const isWinner =
+                      datePollResult.winner?.optionId === opt.optionId;
+                    return (
+                      <tr
+                        key={opt.optionId}
+                        className={`border-b last:border-b-0 ${
+                          isWinner ? "bg-blue-50" : ""
+                        }`}
+                      >
+                        <td className="py-3 pr-4">
+                          <span
+                            className={`font-medium ${
+                              isWinner ? "text-blue-700" : "text-gray-700"
+                            }`}
+                          >
+                            {opt.label}
+                            {isWinner && " *"}
+                          </span>
+                        </td>
+                        <td className="py-3 px-4 text-center">
+                          <span className="inline-flex items-center justify-center rounded-full bg-green-100 px-2.5 py-0.5 text-sm font-semibold text-green-800">
+                            {opt.yes}
+                          </span>
+                        </td>
+                        <td className="py-3 px-4 text-center">
+                          <span className="inline-flex items-center justify-center rounded-full bg-yellow-100 px-2.5 py-0.5 text-sm font-semibold text-yellow-800">
+                            {opt.maybe}
+                          </span>
+                        </td>
+                        <td className="py-3 pl-4 text-center">
+                          <span className="inline-flex items-center justify-center rounded-full bg-red-100 px-2.5 py-0.5 text-sm font-semibold text-red-800">
+                            {opt.no}
+                          </span>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        );
+      })()}
+
+      {/* Approval — bar chart showing approval count per option */}
+      {result.format === "approval" && (() => {
+        const approvalResult = result as ApprovalResult;
+        return (
+          <div className="rounded-lg border bg-white p-5">
+            <h2 className="text-lg font-semibold text-gray-900">
+              Approval Results
+            </h2>
+            <p className="mt-1 text-sm text-gray-500">
+              {approvalResult.totalBallots} ballot
+              {approvalResult.totalBallots !== 1 ? "s" : ""} cast
+            </p>
+            <div className="mt-4 space-y-3">
+              {approvalResult.counts.map((item) => {
+                const percentage =
+                  approvalResult.totalBallots > 0
+                    ? Math.round(
+                        (item.count / approvalResult.totalBallots) * 100
+                      )
+                    : 0;
+                const isWinner =
+                  approvalResult.winner?.optionId === item.optionId;
+
+                return (
+                  <div key={item.optionId}>
+                    <div className="flex items-center justify-between text-sm">
+                      <span
+                        className={`font-medium ${
+                          isWinner ? "text-blue-700" : "text-gray-700"
+                        }`}
+                      >
+                        {item.label}
+                        {isWinner && " *"}
+                      </span>
+                      <span className="text-gray-500">
+                        {item.count} approval{item.count !== 1 ? "s" : ""} (
+                        {percentage}%)
+                      </span>
+                    </div>
+                    <div className="mt-1 h-4 w-full overflow-hidden rounded-full bg-gray-200">
+                      <div
+                        className={`h-full rounded-full transition-all ${
+                          isWinner ? "bg-blue-600" : "bg-gray-400"
+                        }`}
+                        style={{ width: `${percentage}%` }}
+                      />
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        );
+      })()}
+
+      {/* RSVP — three stat cards for Going / Not Going / Maybe */}
+      {result.format === "rsvp" && (() => {
+        const rsvpResult = result as RsvpResult;
+        const goingPct =
+          rsvpResult.totalBallots > 0
+            ? Math.round(
+                (rsvpResult.goingCount / rsvpResult.totalBallots) * 100
+              )
+            : 0;
+        const notGoingPct =
+          rsvpResult.totalBallots > 0
+            ? Math.round(
+                (rsvpResult.notGoingCount / rsvpResult.totalBallots) * 100
+              )
+            : 0;
+        const maybePct =
+          rsvpResult.totalBallots > 0
+            ? Math.round(
+                (rsvpResult.maybeCount / rsvpResult.totalBallots) * 100
+              )
+            : 0;
+
+        return (
+          <div className="space-y-4">
+            <div>
+              <h2 className="text-lg font-semibold text-gray-900">
+                Attendance
+              </h2>
+              <p className="mt-1 text-sm text-gray-500">
+                {rsvpResult.totalBallots} response
+                {rsvpResult.totalBallots !== 1 ? "s" : ""} received
+              </p>
+            </div>
+            <div className="grid grid-cols-3 gap-4">
+              <div className="rounded-lg border bg-green-50 p-5 text-center">
+                <div className="text-sm font-medium text-green-700">Going</div>
+                <div className="mt-2 text-3xl font-bold text-green-800">
+                  {rsvpResult.goingCount}
+                </div>
+                <div className="mt-1 text-sm text-green-600">{goingPct}%</div>
+              </div>
+              <div className="rounded-lg border bg-yellow-50 p-5 text-center">
+                <div className="text-sm font-medium text-yellow-700">Maybe</div>
+                <div className="mt-2 text-3xl font-bold text-yellow-800">
+                  {rsvpResult.maybeCount}
+                </div>
+                <div className="mt-1 text-sm text-yellow-600">{maybePct}%</div>
+              </div>
+              <div className="rounded-lg border bg-red-50 p-5 text-center">
+                <div className="text-sm font-medium text-red-700">
+                  Not Going
+                </div>
+                <div className="mt-2 text-3xl font-bold text-red-800">
+                  {rsvpResult.notGoingCount}
+                </div>
+                <div className="mt-1 text-sm text-red-600">{notGoingPct}%</div>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
+
+      {/* Score Rating — average score per option with distribution */}
+      {result.format === "score_rating" && (() => {
+        const scoreResult = result as ScoreRatingResult;
+        return (
+          <div className="rounded-lg border bg-white p-5">
+            <h2 className="text-lg font-semibold text-gray-900">
+              Score Ratings
+            </h2>
+            <p className="mt-1 text-sm text-gray-500">
+              {scoreResult.totalBallots} ballot
+              {scoreResult.totalBallots !== 1 ? "s" : ""} cast
+            </p>
+            <div className="mt-4 space-y-4">
+              {scoreResult.options.map((opt) => {
+                const isWinner =
+                  scoreResult.winner?.optionId === opt.optionId;
+                const fullStars = Math.floor(opt.averageScore);
+                const hasHalf = opt.averageScore - fullStars >= 0.25 && opt.averageScore - fullStars < 0.75;
+                const roundedUp = opt.averageScore - fullStars >= 0.75;
+
+                return (
+                  <div
+                    key={opt.optionId}
+                    className={`rounded-lg border p-4 ${
+                      isWinner ? "border-blue-300 bg-blue-50" : "bg-gray-50"
+                    }`}
+                  >
+                    <div className="flex items-center justify-between">
+                      <span
+                        className={`font-medium ${
+                          isWinner ? "text-blue-700" : "text-gray-700"
+                        }`}
+                      >
+                        {opt.label}
+                        {isWinner && " *"}
+                      </span>
+                      <span className="text-sm text-gray-500">
+                        {opt.ratingCount} rating
+                        {opt.ratingCount !== 1 ? "s" : ""}
+                      </span>
+                    </div>
+                    <div className="mt-2 flex items-center gap-2">
+                      <div className="flex items-center gap-0.5 text-lg">
+                        {Array.from({ length: 5 }, (_, i) => {
+                          const starIndex = i + 1;
+                          const filled =
+                            starIndex <= fullStars ||
+                            (roundedUp && starIndex === fullStars + 1);
+                          const half =
+                            hasHalf && starIndex === fullStars + 1;
+
+                          return (
+                            <span
+                              key={i}
+                              className={
+                                filled
+                                  ? "text-yellow-500"
+                                  : half
+                                    ? "text-yellow-400"
+                                    : "text-gray-300"
+                              }
+                            >
+                              {filled ? "\u2605" : half ? "\u2605" : "\u2606"}
+                            </span>
+                          );
+                        })}
+                      </div>
+                      <span className="text-lg font-bold text-gray-900">
+                        {opt.averageScore.toFixed(1)}
+                      </span>
+                      <span className="text-sm text-gray-500">/ 5</span>
+                    </div>
+                    <div className="mt-2 flex items-center gap-1 text-xs text-gray-500">
+                      {[5, 4, 3, 2, 1].map((score) => (
+                        <div key={score} className="flex items-center gap-0.5">
+                          <span>{score}\u2605</span>
+                          <span className="font-medium">
+                            {opt.distribution[score] || 0}
+                          </span>
+                          {score > 1 && (
+                            <span className="mx-1 text-gray-300">|</span>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        );
+      })()}
+
+      {/* Multi-Select — bar chart showing selection count per option */}
+      {result.format === "multi_select" && (() => {
+        const multiSelectResult = result as MultiSelectResult;
+        return (
+          <div className="rounded-lg border bg-white p-5">
+            <h2 className="text-lg font-semibold text-gray-900">
+              Selection Results
+            </h2>
+            <p className="mt-1 text-sm text-gray-500">
+              {multiSelectResult.totalBallots} ballot
+              {multiSelectResult.totalBallots !== 1 ? "s" : ""} cast
+            </p>
+            <div className="mt-4 space-y-3">
+              {multiSelectResult.counts.map((item) => {
+                const percentage =
+                  multiSelectResult.totalBallots > 0
+                    ? Math.round(
+                        (item.count / multiSelectResult.totalBallots) * 100
+                      )
+                    : 0;
+                const isWinner =
+                  multiSelectResult.winner?.optionId === item.optionId;
+
+                return (
+                  <div key={item.optionId}>
+                    <div className="flex items-center justify-between text-sm">
+                      <span
+                        className={`font-medium ${
+                          isWinner ? "text-blue-700" : "text-gray-700"
+                        }`}
+                      >
+                        {item.label}
+                        {isWinner && " *"}
+                      </span>
+                      <span className="text-gray-500">
+                        {item.count} selection{item.count !== 1 ? "s" : ""} (
+                        {percentage}%)
+                      </span>
+                    </div>
+                    <div className="mt-1 h-4 w-full overflow-hidden rounded-full bg-gray-200">
+                      <div
+                        className={`h-full rounded-full transition-all ${
+                          isWinner ? "bg-blue-600" : "bg-gray-400"
+                        }`}
+                        style={{ width: `${percentage}%` }}
+                      />
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        );
+      })()}
     </div>
   );
 }

@@ -7,9 +7,18 @@ import { revalidatePath } from "next/cache";
 import { cookies } from "next/headers";
 import type { PrivacyLevel } from "@/lib/types";
 
+export type VoteChoice =
+  | { option_id: string }           // yes_no, multiple_choice
+  | { ranked: string[] }            // ranked_choice
+  | { responses: Record<string, string> }  // date_poll
+  | { approved: string[] }          // approval
+  | { response: string }            // rsvp
+  | { scores: Record<string, number> }     // score_rating
+  | { selected: string[] };         // multi_select
+
 interface CastVoteInput {
   voteId: string;
-  choice: { option_id: string } | { ranked: string[] };
+  choice: VoteChoice;
   privacyLevel: PrivacyLevel;
 }
 

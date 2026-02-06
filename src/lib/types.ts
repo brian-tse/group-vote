@@ -1,6 +1,14 @@
 export type MemberRole = "admin" | "member";
 
-export type VoteFormat = "yes_no" | "multiple_choice" | "ranked_choice";
+export type VoteFormat =
+  | "yes_no"
+  | "multiple_choice"
+  | "ranked_choice"
+  | "date_poll"
+  | "approval"
+  | "rsvp"
+  | "score_rating"
+  | "multi_select";
 
 export type PrivacyLevel = "anonymous" | "admin_visible" | "open";
 

@@ -54,7 +54,17 @@ export default async function VoteDetailPage({ params }: Props) {
     .eq("active", true);
 
   const typedVote = vote as Vote;
-  const typedOptions = (options || []) as VoteOption[];
+  const allOptions = (options || []) as VoteOption[];
+
+  // Extract max_selections config option for multi_select and filter it out
+  let maxSelections: number | null = null;
+  const typedOptions = allOptions.filter((opt) => {
+    if (opt.label === "__max_selections__") {
+      maxSelections = parseInt(opt.description || "3", 10);
+      return false;
+    }
+    return true;
+  });
 
   // Check if the current member has already voted
   const { data: participation } = await adminClient
@@ -69,7 +79,22 @@ export default async function VoteDetailPage({ params }: Props) {
   // Get existing choice for non-anonymous votes
   let existingChoice: string | null = null;
   let existingRanking: string[] | null = null;
+  let existingResponses: Record<string, string> | null = null;
+  let existingApproved: string[] | null = null;
+  let existingRsvpResponse: string | null = null;
+  let existingScores: Record<string, number> | null = null;
+  let existingSelected: string[] | null = null;
   let sessionToken: string | null = null;
+
+  function extractChoiceData(choice: Record<string, unknown>) {
+    if ("option_id" in choice) existingChoice = choice.option_id as string;
+    if ("ranked" in choice) existingRanking = choice.ranked as string[];
+    if ("responses" in choice) existingResponses = choice.responses as Record<string, string>;
+    if ("approved" in choice) existingApproved = choice.approved as string[];
+    if ("response" in choice) existingRsvpResponse = choice.response as string;
+    if ("scores" in choice) existingScores = choice.scores as Record<string, number>;
+    if ("selected" in choice) existingSelected = choice.selected as string[];
+  }
 
   if (hasVoted) {
     if (typedVote.privacy_level === "anonymous") {
@@ -83,9 +108,7 @@ export default async function VoteDetailPage({ params }: Props) {
           .eq("vote_id", id)
           .single();
         if (anonBallot) {
-          const choice = anonBallot.choice as Record<string, unknown>;
-          if ("option_id" in choice) existingChoice = choice.option_id as string;
-          if ("ranked" in choice) existingRanking = choice.ranked as string[];
+          extractChoiceData(anonBallot.choice as Record<string, unknown>);
         }
       }
     } else {
@@ -96,9 +119,7 @@ export default async function VoteDetailPage({ params }: Props) {
         .eq("member_id", member.id)
         .single();
       if (namedBallot) {
-        const choice = namedBallot.choice as Record<string, unknown>;
-        if ("option_id" in choice) existingChoice = choice.option_id as string;
-        if ("ranked" in choice) existingRanking = choice.ranked as string[];
+        extractChoiceData(namedBallot.choice as Record<string, unknown>);
       }
     }
   }
@@ -197,6 +218,12 @@ export default async function VoteDetailPage({ params }: Props) {
               options={typedOptions}
               existingChoice={existingChoice}
               existingRanking={existingRanking}
+              existingResponses={existingResponses}
+              existingApproved={existingApproved}
+              existingRsvpResponse={existingRsvpResponse}
+              existingScores={existingScores}
+              existingSelected={existingSelected}
+              maxSelections={maxSelections ?? undefined}
               hasVoted={hasVoted}
               sessionToken={sessionToken}
             />

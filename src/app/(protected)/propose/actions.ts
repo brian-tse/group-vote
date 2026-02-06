@@ -10,6 +10,15 @@ export interface ProposeVoteState {
   fieldErrors: Record<string, string>;
 }
 
+// Formats that use standard option_label_N fields
+const STANDARD_OPTION_FORMATS: VoteFormat[] = [
+  "multiple_choice",
+  "ranked_choice",
+  "approval",
+  "score_rating",
+  "multi_select",
+];
+
 export async function proposeVote(
   _prevState: ProposeVoteState,
   formData: FormData
@@ -29,18 +38,37 @@ export async function proposeVote(
     ? parseInt(formData.get("custom_threshold_percentage") as string, 10)
     : null;
 
-  // Parse options from dynamic form fields
+  // Parse standard text options
   const options: { label: string; description: string | null }[] = [];
-  let i = 0;
-  while (formData.has(`option_label_${i}`)) {
-    const label = (formData.get(`option_label_${i}`) as string)?.trim();
-    const optDesc =
-      (formData.get(`option_description_${i}`) as string)?.trim() || null;
-    if (label) {
-      options.push({ label, description: optDesc });
+  if (STANDARD_OPTION_FORMATS.includes(format)) {
+    let i = 0;
+    while (formData.has(`option_label_${i}`)) {
+      const label = (formData.get(`option_label_${i}`) as string)?.trim();
+      const optDesc =
+        (formData.get(`option_description_${i}`) as string)?.trim() || null;
+      if (label) {
+        options.push({ label, description: optDesc });
+      }
+      i++;
     }
-    i++;
   }
+
+  // Parse date options for date_poll
+  const dateOptions: string[] = [];
+  if (format === "date_poll") {
+    let i = 0;
+    while (formData.has(`option_date_${i}`)) {
+      const dateVal = (formData.get(`option_date_${i}`) as string)?.trim();
+      if (dateVal) {
+        dateOptions.push(dateVal);
+      }
+      i++;
+    }
+  }
+
+  // Parse max_selections for multi_select
+  const maxSelectionsStr = formData.get("max_selections") as string | null;
+  const maxSelections = maxSelectionsStr ? parseInt(maxSelectionsStr, 10) : 3;
 
   // Validation
   const fieldErrors: Record<string, string> = {};
@@ -67,8 +95,13 @@ export async function proposeVote(
       "Custom threshold must be between 1 and 100.";
   }
 
-  if (format === "yes_no") {
-    // Auto-populate options on approval
+  // Format-specific option validation
+  if (format === "yes_no" || format === "rsvp") {
+    // Auto-populated — no user options needed
+  } else if (format === "date_poll") {
+    if (dateOptions.length < 2) {
+      fieldErrors.options = "At least 2 date/time options are required.";
+    }
   } else if (options.length < 2) {
     fieldErrors.options = "At least 2 options are required.";
   }
@@ -77,11 +110,33 @@ export async function proposeVote(
     fieldErrors.options = "Ranked choice requires at least 3 options.";
   }
 
+  if (format === "multi_select" && (isNaN(maxSelections) || maxSelections < 1)) {
+    fieldErrors.max_selections = "Maximum selections must be at least 1.";
+  }
+
   if (Object.keys(fieldErrors).length > 0) {
     return { error: "Please fix the errors below.", fieldErrors };
   }
 
   const adminClient = createAdminClient();
+
+  // Build the options JSON for storage in the proposal
+  let optionsJson: string;
+  if (format === "yes_no" || format === "rsvp") {
+    optionsJson = JSON.stringify([]);
+  } else if (format === "date_poll") {
+    optionsJson = JSON.stringify(
+      dateOptions.map((dateVal) => ({ label: dateVal, description: null }))
+    );
+  } else if (format === "multi_select") {
+    // Include max_selections metadata in the options JSON
+    optionsJson = JSON.stringify({
+      max_selections: maxSelections,
+      items: options,
+    });
+  } else {
+    optionsJson = JSON.stringify(options);
+  }
 
   const { error } = await adminClient.from("vote_proposals").insert({
     proposed_by: member.id,
@@ -89,7 +144,7 @@ export async function proposeVote(
     description,
     format,
     privacy_level: privacyLevel,
-    options: format === "yes_no" ? JSON.stringify([]) : JSON.stringify(options),
+    options: optionsJson,
     quorum_percentage: quorumPercentage,
     passing_threshold: passingThreshold,
     custom_threshold_percentage:

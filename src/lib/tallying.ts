@@ -54,7 +54,103 @@ export interface RankedChoiceResult {
   thresholdActual: number;
 }
 
-export type VoteResult = YesNoResult | MultipleChoiceResult | RankedChoiceResult;
+export interface DatePollOptionResult {
+  optionId: string;
+  label: string;
+  yes: number;
+  no: number;
+  maybe: number;
+}
+
+export interface DatePollResult {
+  format: "date_poll";
+  totalBallots: number;
+  options: DatePollOptionResult[];
+  winner: { optionId: string; label: string; count: number } | null;
+  passed: boolean;
+  meetsQuorum: boolean;
+  meetsThreshold: boolean;
+  quorumRequired: number;
+  quorumActual: number;
+  thresholdRequired: number;
+  thresholdActual: number;
+}
+
+export interface ApprovalResult {
+  format: "approval";
+  totalBallots: number;
+  counts: { optionId: string; label: string; count: number }[];
+  winner: { optionId: string; label: string; count: number } | null;
+  passed: boolean;
+  meetsQuorum: boolean;
+  meetsThreshold: boolean;
+  quorumRequired: number;
+  quorumActual: number;
+  thresholdRequired: number;
+  thresholdActual: number;
+}
+
+export interface RsvpResult {
+  format: "rsvp";
+  totalBallots: number;
+  goingCount: number;
+  notGoingCount: number;
+  maybeCount: number;
+  winner: { optionId: string; label: string; count: number } | null;
+  passed: boolean;
+  meetsQuorum: boolean;
+  meetsThreshold: boolean;
+  quorumRequired: number;
+  quorumActual: number;
+  thresholdRequired: number;
+  thresholdActual: number;
+}
+
+export interface ScoreRatingOptionResult {
+  optionId: string;
+  label: string;
+  averageScore: number;
+  ratingCount: number;
+  distribution: Record<number, number>;
+}
+
+export interface ScoreRatingResult {
+  format: "score_rating";
+  totalBallots: number;
+  options: ScoreRatingOptionResult[];
+  winner: { optionId: string; label: string; count: number } | null;
+  passed: boolean;
+  meetsQuorum: boolean;
+  meetsThreshold: boolean;
+  quorumRequired: number;
+  quorumActual: number;
+  thresholdRequired: number;
+  thresholdActual: number;
+}
+
+export interface MultiSelectResult {
+  format: "multi_select";
+  totalBallots: number;
+  counts: { optionId: string; label: string; count: number }[];
+  winner: { optionId: string; label: string; count: number } | null;
+  passed: boolean;
+  meetsQuorum: boolean;
+  meetsThreshold: boolean;
+  quorumRequired: number;
+  quorumActual: number;
+  thresholdRequired: number;
+  thresholdActual: number;
+}
+
+export type VoteResult =
+  | YesNoResult
+  | MultipleChoiceResult
+  | RankedChoiceResult
+  | DatePollResult
+  | ApprovalResult
+  | RsvpResult
+  | ScoreRatingResult
+  | MultiSelectResult;
 
 // ============================================================
 // THRESHOLD HELPERS
@@ -430,6 +526,372 @@ export async function tallyRankedChoice(
 }
 
 // ============================================================
+// DATE POLL TALLYING
+// ============================================================
+
+export async function tallyDatePoll(
+  vote: Vote,
+  options: VoteOption[],
+  activeMemberCount: number
+): Promise<DatePollResult> {
+  const ballots = await fetchBallots(vote.id, vote.privacy_level);
+  const totalBallots = ballots.length;
+
+  // Build per-option yes/no/maybe counts
+  const optionResults: DatePollOptionResult[] = options.map((opt) => ({
+    optionId: opt.id,
+    label: opt.label,
+    yes: 0,
+    no: 0,
+    maybe: 0,
+  }));
+
+  const optionMap = new Map<string, DatePollOptionResult>();
+  for (const optResult of optionResults) {
+    optionMap.set(optResult.optionId, optResult);
+  }
+
+  for (const ballot of ballots) {
+    const choice = ballot.choice as {
+      responses: Record<string, "yes" | "no" | "maybe">;
+    };
+    for (const [optionId, response] of Object.entries(choice.responses)) {
+      const opt = optionMap.get(optionId);
+      if (opt) {
+        if (response === "yes") opt.yes++;
+        else if (response === "no") opt.no++;
+        else if (response === "maybe") opt.maybe++;
+      }
+    }
+  }
+
+  // Winner = option with most "yes" votes
+  const sorted = [...optionResults].sort((a, b) => b.yes - a.yes);
+  const topOption = sorted[0];
+  const winner =
+    topOption && topOption.yes > 0
+      ? { optionId: topOption.optionId, label: topOption.label, count: topOption.yes }
+      : null;
+
+  // Quorum check
+  const quorumRequired = vote.quorum_percentage / 100;
+  const quorumActual =
+    activeMemberCount > 0 ? totalBallots / activeMemberCount : 0;
+  const meetsQuorum = quorumActual >= quorumRequired;
+
+  // Threshold — winning date's yes-count / total ballots
+  const thresholdFraction = getThresholdFraction(
+    vote.passing_threshold,
+    vote.custom_threshold_percentage
+  );
+  const thresholdActual =
+    totalBallots > 0 && winner ? winner.count / totalBallots : 0;
+  const meetsThreshold = thresholdActual > thresholdFraction;
+
+  return {
+    format: "date_poll",
+    totalBallots,
+    options: optionResults,
+    winner,
+    passed: meetsQuorum && meetsThreshold,
+    meetsQuorum,
+    meetsThreshold,
+    quorumRequired: vote.quorum_percentage,
+    quorumActual: Math.round(quorumActual * 100),
+    thresholdRequired: Math.round(thresholdFraction * 100),
+    thresholdActual: Math.round(thresholdActual * 100),
+  };
+}
+
+// ============================================================
+// APPROVAL TALLYING
+// ============================================================
+
+export async function tallyApproval(
+  vote: Vote,
+  options: VoteOption[],
+  activeMemberCount: number
+): Promise<ApprovalResult> {
+  const ballots = await fetchBallots(vote.id, vote.privacy_level);
+  const totalBallots = ballots.length;
+
+  // Count approvals per option
+  const countMap = new Map<string, number>();
+  for (const option of options) {
+    countMap.set(option.id, 0);
+  }
+
+  for (const ballot of ballots) {
+    const choice = ballot.choice as { approved: string[] };
+    for (const optionId of choice.approved) {
+      const current = countMap.get(optionId) || 0;
+      countMap.set(optionId, current + 1);
+    }
+  }
+
+  const counts = options.map((opt) => ({
+    optionId: opt.id,
+    label: opt.label,
+    count: countMap.get(opt.id) || 0,
+  }));
+
+  // Winner = most approvals
+  const sorted = [...counts].sort((a, b) => b.count - a.count);
+  const winner = sorted[0]?.count > 0 ? sorted[0] : null;
+
+  // Quorum check
+  const quorumRequired = vote.quorum_percentage / 100;
+  const quorumActual =
+    activeMemberCount > 0 ? totalBallots / activeMemberCount : 0;
+  const meetsQuorum = quorumActual >= quorumRequired;
+
+  // Threshold — winner's approval_count / total_ballots
+  const thresholdFraction = getThresholdFraction(
+    vote.passing_threshold,
+    vote.custom_threshold_percentage
+  );
+  const thresholdActual =
+    totalBallots > 0 && winner ? winner.count / totalBallots : 0;
+  const meetsThreshold = thresholdActual > thresholdFraction;
+
+  return {
+    format: "approval",
+    totalBallots,
+    counts,
+    winner,
+    passed: meetsQuorum && meetsThreshold,
+    meetsQuorum,
+    meetsThreshold,
+    quorumRequired: vote.quorum_percentage,
+    quorumActual: Math.round(quorumActual * 100),
+    thresholdRequired: Math.round(thresholdFraction * 100),
+    thresholdActual: Math.round(thresholdActual * 100),
+  };
+}
+
+// ============================================================
+// RSVP TALLYING
+// ============================================================
+
+export async function tallyRsvp(
+  vote: Vote,
+  options: VoteOption[],
+  activeMemberCount: number
+): Promise<RsvpResult> {
+  const ballots = await fetchBallots(vote.id, vote.privacy_level);
+  const totalBallots = ballots.length;
+
+  let goingCount = 0;
+  let notGoingCount = 0;
+  let maybeCount = 0;
+
+  for (const ballot of ballots) {
+    const choice = ballot.choice as {
+      response: "going" | "not_going" | "maybe";
+    };
+    if (choice.response === "going") goingCount++;
+    else if (choice.response === "not_going") notGoingCount++;
+    else if (choice.response === "maybe") maybeCount++;
+  }
+
+  // Quorum check
+  const quorumRequired = vote.quorum_percentage / 100;
+  const quorumActual =
+    activeMemberCount > 0 ? totalBallots / activeMemberCount : 0;
+  const meetsQuorum = quorumActual >= quorumRequired;
+
+  // RSVP has no true pass/fail threshold — just check quorum
+  // thresholdActual = going_count / total_ballots
+  const thresholdFraction = getThresholdFraction(
+    vote.passing_threshold,
+    vote.custom_threshold_percentage
+  );
+  const thresholdActual =
+    totalBallots > 0 ? goingCount / totalBallots : 0;
+
+  return {
+    format: "rsvp",
+    totalBallots,
+    goingCount,
+    notGoingCount,
+    maybeCount,
+    winner: null,
+    passed: meetsQuorum,
+    meetsQuorum,
+    meetsThreshold: true,
+    quorumRequired: vote.quorum_percentage,
+    quorumActual: Math.round(quorumActual * 100),
+    thresholdRequired: Math.round(thresholdFraction * 100),
+    thresholdActual: Math.round(thresholdActual * 100),
+  };
+}
+
+// ============================================================
+// SCORE RATING TALLYING
+// ============================================================
+
+export async function tallyScoreRating(
+  vote: Vote,
+  options: VoteOption[],
+  activeMemberCount: number
+): Promise<ScoreRatingResult> {
+  const ballots = await fetchBallots(vote.id, vote.privacy_level);
+  const totalBallots = ballots.length;
+
+  // Build per-option accumulators
+  const scoreData = new Map<
+    string,
+    { total: number; count: number; distribution: Record<number, number> }
+  >();
+  for (const option of options) {
+    scoreData.set(option.id, {
+      total: 0,
+      count: 0,
+      distribution: { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 },
+    });
+  }
+
+  for (const ballot of ballots) {
+    const choice = ballot.choice as { scores: Record<string, number> };
+    for (const [optionId, score] of Object.entries(choice.scores)) {
+      const data = scoreData.get(optionId);
+      if (data) {
+        data.total += score;
+        data.count++;
+        const roundedScore = Math.round(score);
+        if (roundedScore >= 1 && roundedScore <= 5) {
+          data.distribution[roundedScore]++;
+        }
+      }
+    }
+  }
+
+  const optionResults: ScoreRatingOptionResult[] = options.map((opt) => {
+    const data = scoreData.get(opt.id) || {
+      total: 0,
+      count: 0,
+      distribution: { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 },
+    };
+    return {
+      optionId: opt.id,
+      label: opt.label,
+      averageScore: data.count > 0 ? data.total / data.count : 0,
+      ratingCount: data.count,
+      distribution: data.distribution,
+    };
+  });
+
+  // Winner = highest average score
+  const sorted = [...optionResults].sort(
+    (a, b) => b.averageScore - a.averageScore
+  );
+  const topOption = sorted[0];
+  const winner =
+    topOption && topOption.ratingCount > 0
+      ? {
+          optionId: topOption.optionId,
+          label: topOption.label,
+          count: topOption.ratingCount,
+        }
+      : null;
+
+  // Quorum check
+  const quorumRequired = vote.quorum_percentage / 100;
+  const quorumActual =
+    activeMemberCount > 0 ? totalBallots / activeMemberCount : 0;
+  const meetsQuorum = quorumActual >= quorumRequired;
+
+  // Threshold — winner's average / 5 (max score) as a percentage
+  const thresholdFraction = getThresholdFraction(
+    vote.passing_threshold,
+    vote.custom_threshold_percentage
+  );
+  const winnerAvg = topOption && topOption.ratingCount > 0 ? topOption.averageScore : 0;
+  const thresholdActual = winnerAvg / 5;
+  const meetsThreshold = thresholdActual > thresholdFraction;
+
+  return {
+    format: "score_rating",
+    totalBallots,
+    options: optionResults,
+    winner,
+    passed: meetsQuorum && meetsThreshold,
+    meetsQuorum,
+    meetsThreshold,
+    quorumRequired: vote.quorum_percentage,
+    quorumActual: Math.round(quorumActual * 100),
+    thresholdRequired: Math.round(thresholdFraction * 100),
+    thresholdActual: Math.round(thresholdActual * 100),
+  };
+}
+
+// ============================================================
+// MULTI-SELECT TALLYING
+// ============================================================
+
+export async function tallyMultiSelect(
+  vote: Vote,
+  options: VoteOption[],
+  activeMemberCount: number
+): Promise<MultiSelectResult> {
+  const ballots = await fetchBallots(vote.id, vote.privacy_level);
+  const totalBallots = ballots.length;
+
+  // Count selections per option
+  const countMap = new Map<string, number>();
+  for (const option of options) {
+    countMap.set(option.id, 0);
+  }
+
+  for (const ballot of ballots) {
+    const choice = ballot.choice as { selected: string[] };
+    for (const optionId of choice.selected) {
+      const current = countMap.get(optionId) || 0;
+      countMap.set(optionId, current + 1);
+    }
+  }
+
+  const counts = options.map((opt) => ({
+    optionId: opt.id,
+    label: opt.label,
+    count: countMap.get(opt.id) || 0,
+  }));
+
+  // Winner = most selections
+  const sorted = [...counts].sort((a, b) => b.count - a.count);
+  const winner = sorted[0]?.count > 0 ? sorted[0] : null;
+
+  // Quorum check
+  const quorumRequired = vote.quorum_percentage / 100;
+  const quorumActual =
+    activeMemberCount > 0 ? totalBallots / activeMemberCount : 0;
+  const meetsQuorum = quorumActual >= quorumRequired;
+
+  // Threshold — winner's selection count / total_ballots
+  const thresholdFraction = getThresholdFraction(
+    vote.passing_threshold,
+    vote.custom_threshold_percentage
+  );
+  const thresholdActual =
+    totalBallots > 0 && winner ? winner.count / totalBallots : 0;
+  const meetsThreshold = thresholdActual > thresholdFraction;
+
+  return {
+    format: "multi_select",
+    totalBallots,
+    counts,
+    winner,
+    passed: meetsQuorum && meetsThreshold,
+    meetsQuorum,
+    meetsThreshold,
+    quorumRequired: vote.quorum_percentage,
+    quorumActual: Math.round(quorumActual * 100),
+    thresholdRequired: Math.round(thresholdFraction * 100),
+    thresholdActual: Math.round(thresholdActual * 100),
+  };
+}
+
+// ============================================================
 // UNIFIED TALLY FUNCTION
 // ============================================================
 
@@ -448,6 +910,16 @@ export async function tallyVote(
       return tallyMultipleChoice(vote, options, activeMemberCount);
     case "ranked_choice":
       return tallyRankedChoice(vote, options, activeMemberCount);
+    case "date_poll":
+      return tallyDatePoll(vote, options, activeMemberCount);
+    case "approval":
+      return tallyApproval(vote, options, activeMemberCount);
+    case "rsvp":
+      return tallyRsvp(vote, options, activeMemberCount);
+    case "score_rating":
+      return tallyScoreRating(vote, options, activeMemberCount);
+    case "multi_select":
+      return tallyMultiSelect(vote, options, activeMemberCount);
     default:
       throw new Error(`Unsupported vote format: ${vote.format}`);
   }
