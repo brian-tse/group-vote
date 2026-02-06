@@ -83,6 +83,22 @@ export async function toggleMemberActive(memberId: string, active: boolean) {
   revalidatePath("/admin/members");
 }
 
+export async function toggleMemberRole(memberId: string, role: "admin" | "member") {
+  await requireAdmin();
+
+  const adminClient = createAdminClient();
+  const { error } = await adminClient
+    .from("members")
+    .update({ role })
+    .eq("id", memberId);
+
+  if (error) {
+    throw new Error(`Failed to update role: ${error.message}`);
+  }
+
+  revalidatePath("/admin/members");
+}
+
 export async function removeMember(memberId: string) {
   await requireAdmin();
 

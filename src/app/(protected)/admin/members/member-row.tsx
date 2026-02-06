@@ -1,7 +1,7 @@
 "use client";
 
 import { useTransition } from "react";
-import { toggleMemberActive, removeMember } from "./actions";
+import { toggleMemberActive, toggleMemberRole, removeMember } from "./actions";
 import type { Member } from "@/lib/types";
 
 export function MemberRow({ member }: { member: Member }) {
@@ -10,6 +10,19 @@ export function MemberRow({ member }: { member: Member }) {
   function handleToggle() {
     startTransition(() => {
       toggleMemberActive(member.id, !member.active);
+    });
+  }
+
+  function handleToggleRole() {
+    const newRole = member.role === "admin" ? "member" : "admin";
+    if (
+      !confirm(
+        `Change ${member.email} role to ${newRole}?`
+      )
+    )
+      return;
+    startTransition(() => {
+      toggleMemberRole(member.id, newRole);
     });
   }
 
@@ -51,6 +64,13 @@ export function MemberRow({ member }: { member: Member }) {
         </span>
       </td>
       <td className="whitespace-nowrap px-4 py-3 text-right text-sm">
+        <button
+          onClick={handleToggleRole}
+          disabled={isPending}
+          className="mr-2 text-purple-600 hover:text-purple-800 disabled:opacity-50"
+        >
+          {member.role === "admin" ? "Make Member" : "Make Admin"}
+        </button>
         <button
           onClick={handleToggle}
           disabled={isPending}
