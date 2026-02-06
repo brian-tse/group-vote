@@ -8,6 +8,7 @@ import {
   PASSING_THRESHOLD_LABELS,
   QUORUM_DEFAULT,
 } from "@/lib/constants";
+import { VoteTypeHelp } from "@/components/vote-type-help";
 import type { VoteFormat } from "@/lib/types";
 
 const initialState: ProposeVoteState = { error: null, fieldErrors: {} };
@@ -114,12 +115,15 @@ export function ProposeForm() {
 
       {/* Format */}
       <div>
-        <label
-          htmlFor="format"
-          className="block text-sm font-medium text-gray-700"
-        >
-          Suggested Format *
-        </label>
+        <div className="flex items-center gap-2">
+          <label
+            htmlFor="format"
+            className="block text-sm font-medium text-gray-700"
+          >
+            Vote Type *
+          </label>
+          <VoteTypeHelp />
+        </div>
         <select
           id="format"
           name="format"

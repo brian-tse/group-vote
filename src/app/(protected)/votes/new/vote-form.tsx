@@ -9,6 +9,7 @@ import {
   QUORUM_DEFAULT,
 } from "@/lib/constants";
 import type { VoteFormat } from "@/lib/types";
+import { VoteTypeHelp } from "@/components/vote-type-help";
 
 const initialState: CreateVoteState = { error: null, fieldErrors: {} };
 
@@ -101,9 +102,12 @@ export function VoteForm() {
       </div>
 
       <div>
-        <label htmlFor="format" className="block text-sm font-medium text-gray-700">
-          Vote Format *
-        </label>
+        <div className="flex items-center gap-2">
+          <label htmlFor="format" className="block text-sm font-medium text-gray-700">
+            Vote Type *
+          </label>
+          <VoteTypeHelp />
+        </div>
         <select
           id="format"
           name="format"
