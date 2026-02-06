@@ -33,6 +33,7 @@ export function ProposeForm() {
     { label: "", description: "" },
   ]);
   const [dateOptions, setDateOptions] = useState(["", ""]);
+  const [includeTime, setIncludeTime] = useState(false);
   const [maxSelections, setMaxSelections] = useState(3);
 
   function addOption() {
@@ -228,18 +229,30 @@ export function ProposeForm() {
       {showDateOptions && (
         <div>
           <label className="block text-sm font-medium text-gray-700">
-            Date/Time Options *
+            Date Options *
           </label>
-          <div className="mt-2 space-y-3">
+          <div className="mt-2">
+            <label className="inline-flex items-center gap-2 text-sm text-gray-600">
+              <input
+                type="checkbox"
+                checked={includeTime}
+                onChange={(e) => setIncludeTime(e.target.checked)}
+                className="rounded border-gray-300"
+              />
+              Include time
+            </label>
+            <input type="hidden" name="date_include_time" value={includeTime ? "1" : "0"} />
+          </div>
+          <div className="mt-3 space-y-3">
             {dateOptions.map((dt, idx) => (
               <div key={idx} className="flex gap-2 items-center">
                 <div className="flex-1">
                   <label className="block text-xs text-gray-500 mb-1">
-                    Date/Time option {idx + 1}
+                    {includeTime ? "Date/Time" : "Date"} option {idx + 1}
                   </label>
                   <input
                     name={`option_date_${idx}`}
-                    type="datetime-local"
+                    type={includeTime ? "datetime-local" : "date"}
                     required
                     defaultValue={dt}
                     className="block w-full rounded-lg border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
@@ -262,7 +275,7 @@ export function ProposeForm() {
             onClick={addDateOption}
             className="mt-2 text-sm font-medium text-blue-600 hover:text-blue-800"
           >
-            + Add date/time option
+            + Add date option
           </button>
           {state.fieldErrors.options && (
             <p className="mt-1 text-sm text-red-600">

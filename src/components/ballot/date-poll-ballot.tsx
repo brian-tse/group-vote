@@ -31,6 +31,34 @@ const responseConfig = {
 
 type ResponseValue = keyof typeof responseConfig;
 
+function formatDateLabel(label: string): string {
+  // If it contains "T" or ":", it has a time component
+  if (label.includes("T") || label.includes(":")) {
+    const d = new Date(label);
+    if (!isNaN(d.getTime())) {
+      return d.toLocaleString(undefined, {
+        weekday: "short",
+        month: "short",
+        day: "numeric",
+        year: "numeric",
+        hour: "numeric",
+        minute: "2-digit",
+      });
+    }
+  }
+  // Date only (e.g., "2026-03-15")
+  const d = new Date(label + "T00:00:00");
+  if (!isNaN(d.getTime())) {
+    return d.toLocaleDateString(undefined, {
+      weekday: "short",
+      month: "short",
+      day: "numeric",
+      year: "numeric",
+    });
+  }
+  return label;
+}
+
 export function DatePollBallot({
   options,
   currentResponses,
@@ -68,7 +96,7 @@ export function DatePollBallot({
             className="rounded-lg border-2 border-gray-200 bg-white px-4 py-3"
           >
             <div className="mb-2">
-              <span className="font-medium text-gray-900">{option.label}</span>
+              <span className="font-medium text-gray-900">{formatDateLabel(option.label)}</span>
               {option.description && (
                 <p className="mt-0.5 text-sm text-gray-500">
                   {option.description}
