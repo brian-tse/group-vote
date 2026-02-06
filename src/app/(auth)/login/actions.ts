@@ -52,8 +52,9 @@ export async function loginWithMagicLink(
   });
 
   if (authError) {
+    console.error("Magic link error:", authError.message);
     return {
-      error: "Failed to send login link. Please try again.",
+      error: `Failed to send login link: ${authError.message}`,
       success: false,
     };
   }

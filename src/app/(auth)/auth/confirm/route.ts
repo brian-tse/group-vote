@@ -6,6 +6,7 @@ export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
   const token_hash = searchParams.get("token_hash");
   const type = searchParams.get("type") as "magiclink" | "email" | null;
+  const code = searchParams.get("code");
   const next = searchParams.get("next") ?? "/dashboard";
 
   const appUrl = process.env.NEXT_PUBLIC_APP_URL;
@@ -15,7 +16,7 @@ export async function GET(request: NextRequest) {
 
   const redirectTo = new URL(next, appUrl);
 
-  if (!token_hash || !type) {
+  if (!token_hash && !code) {
     redirectTo.pathname = "/login";
     redirectTo.searchParams.set("error", "Invalid login link");
     return NextResponse.redirect(redirectTo);
@@ -43,14 +44,28 @@ export async function GET(request: NextRequest) {
     },
   });
 
-  const { data, error } = await supabase.auth.verifyOtp({
-    token_hash,
-    type: type === "magiclink" ? "magiclink" : "email",
-  });
+  let data;
+  let error;
 
-  if (error || !data.user) {
+  if (code) {
+    // PKCE flow: exchange the code for a session
+    const result = await supabase.auth.exchangeCodeForSession(code);
+    data = result.data;
+    error = result.error;
+  } else if (token_hash) {
+    // Token hash flow: verify the OTP directly
+    const result = await supabase.auth.verifyOtp({
+      token_hash,
+      type: type === "magiclink" ? "magiclink" : "email",
+    });
+    data = result.data;
+    error = result.error;
+  }
+
+  if (error || !data?.user) {
+    console.error("Auth confirm error:", error?.message);
     redirectTo.pathname = "/login";
-    redirectTo.searchParams.set("error", "Login link expired or invalid");
+    redirectTo.searchParams.set("error", error?.message || "Login link expired or invalid");
     return NextResponse.redirect(redirectTo);
   }
 
