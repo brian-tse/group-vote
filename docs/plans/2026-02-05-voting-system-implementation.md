@@ -2834,4 +2834,4466 @@ git commit -m "Add vote detail page with config summary, participation bar, and 
 
 ---
 
-<!-- CONTINUED IN PART 2 -->
+## Phase 6: Vote Proposal Workflow
+
+### Task 6.1 — Propose a Vote Form (Member-Facing)
+
+**Files:**
+- `/Users/briantse/Projects/group-vote/src/app/(protected)/propose/page.tsx` (replace placeholder)
+- `/Users/briantse/Projects/group-vote/src/app/(protected)/propose/propose-form.tsx` (create)
+- `/Users/briantse/Projects/group-vote/src/app/(protected)/propose/actions.ts` (create)
+
+**Steps:**
+
+1. Create the server action for submitting a proposal:
+
+```ts
+// src/app/(protected)/propose/actions.ts
+"use server";
+
+import { getCurrentMember } from "@/lib/auth";
+import { createAdminClient } from "@/lib/supabase/admin";
+import { redirect } from "next/navigation";
+import type { VoteFormat, PrivacyLevel, PassingThreshold } from "@/lib/types";
+
+export interface ProposeVoteState {
+  error: string | null;
+  fieldErrors: Record<string, string>;
+}
+
+export async function proposeVote(
+  _prevState: ProposeVoteState,
+  formData: FormData
+): Promise<ProposeVoteState> {
+  const member = await getCurrentMember();
+
+  const title = (formData.get("title") as string)?.trim();
+  const description = (formData.get("description") as string)?.trim() || null;
+  const format = formData.get("format") as VoteFormat;
+  const privacyLevel = formData.get("privacy_level") as PrivacyLevel;
+  const quorumPercentage = parseInt(
+    formData.get("quorum_percentage") as string,
+    10
+  );
+  const passingThreshold = formData.get("passing_threshold") as PassingThreshold;
+  const customThresholdPercentage = formData.get("custom_threshold_percentage")
+    ? parseInt(formData.get("custom_threshold_percentage") as string, 10)
+    : null;
+
+  // Parse options from dynamic form fields
+  const options: { label: string; description: string | null }[] = [];
+  let i = 0;
+  while (formData.has(`option_label_${i}`)) {
+    const label = (formData.get(`option_label_${i}`) as string)?.trim();
+    const optDesc =
+      (formData.get(`option_description_${i}`) as string)?.trim() || null;
+    if (label) {
+      options.push({ label, description: optDesc });
+    }
+    i++;
+  }
+
+  // Validation
+  const fieldErrors: Record<string, string> = {};
+
+  if (!title) fieldErrors.title = "Title is required.";
+  if (!format) fieldErrors.format = "Vote format is required.";
+  if (!privacyLevel) fieldErrors.privacy_level = "Privacy level is required.";
+  if (
+    isNaN(quorumPercentage) ||
+    quorumPercentage < 0 ||
+    quorumPercentage > 100
+  ) {
+    fieldErrors.quorum_percentage = "Quorum must be between 0 and 100.";
+  }
+  if (!passingThreshold)
+    fieldErrors.passing_threshold = "Passing threshold is required.";
+  if (
+    passingThreshold === "custom" &&
+    (customThresholdPercentage === null ||
+      customThresholdPercentage <= 0 ||
+      customThresholdPercentage > 100)
+  ) {
+    fieldErrors.custom_threshold_percentage =
+      "Custom threshold must be between 1 and 100.";
+  }
+
+  if (format === "yes_no") {
+    // Auto-populate options on approval
+  } else if (options.length < 2) {
+    fieldErrors.options = "At least 2 options are required.";
+  }
+
+  if (format === "ranked_choice" && options.length < 3) {
+    fieldErrors.options = "Ranked choice requires at least 3 options.";
+  }
+
+  if (Object.keys(fieldErrors).length > 0) {
+    return { error: "Please fix the errors below.", fieldErrors };
+  }
+
+  const adminClient = createAdminClient();
+
+  const { error } = await adminClient.from("vote_proposals").insert({
+    proposed_by: member.id,
+    title,
+    description,
+    format,
+    privacy_level: privacyLevel,
+    options: format === "yes_no" ? JSON.stringify([]) : JSON.stringify(options),
+    quorum_percentage: quorumPercentage,
+    passing_threshold: passingThreshold,
+    custom_threshold_percentage:
+      passingThreshold === "custom" ? customThresholdPercentage : null,
+    status: "pending",
+  });
+
+  if (error) {
+    return {
+      error: `Failed to submit proposal: ${error.message}`,
+      fieldErrors: {},
+    };
+  }
+
+  redirect("/dashboard");
+}
+```
+
+2. Create the proposal form client component. This reuses the same layout as the vote creation form but is available to all members:
+
+```tsx
+// src/app/(protected)/propose/propose-form.tsx
+"use client";
+
+import { useActionState, useState } from "react";
+import { proposeVote, type ProposeVoteState } from "./actions";
+import {
+  VOTE_FORMAT_LABELS,
+  PRIVACY_LEVEL_LABELS,
+  PASSING_THRESHOLD_LABELS,
+  QUORUM_DEFAULT,
+} from "@/lib/constants";
+import type { VoteFormat } from "@/lib/types";
+
+const initialState: ProposeVoteState = { error: null, fieldErrors: {} };
+
+export function ProposeForm() {
+  const [state, formAction, isPending] = useActionState(
+    proposeVote,
+    initialState
+  );
+  const [format, setFormat] = useState<VoteFormat>("yes_no");
+  const [showCustomThreshold, setShowCustomThreshold] = useState(false);
+  const [options, setOptions] = useState([
+    { label: "", description: "" },
+    { label: "", description: "" },
+  ]);
+
+  function addOption() {
+    setOptions([...options, { label: "", description: "" }]);
+  }
+
+  function removeOption(index: number) {
+    if (options.length <= 2) return;
+    setOptions(options.filter((_, i) => i !== index));
+  }
+
+  const showOptions = format !== "yes_no";
+
+  return (
+    <form action={formAction} className="space-y-6">
+      {state.error && (
+        <div className="rounded-lg bg-red-50 p-4 text-sm text-red-700">
+          {state.error}
+        </div>
+      )}
+
+      {/* Title */}
+      <div>
+        <label
+          htmlFor="title"
+          className="block text-sm font-medium text-gray-700"
+        >
+          Title *
+        </label>
+        <input
+          id="title"
+          name="title"
+          type="text"
+          required
+          className="mt-1 block w-full rounded-lg border border-gray-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+          placeholder="e.g., Should we adopt a new call schedule format?"
+        />
+        {state.fieldErrors.title && (
+          <p className="mt-1 text-sm text-red-600">
+            {state.fieldErrors.title}
+          </p>
+        )}
+      </div>
+
+      {/* Description */}
+      <div>
+        <label
+          htmlFor="description"
+          className="block text-sm font-medium text-gray-700"
+        >
+          Description
+        </label>
+        <textarea
+          id="description"
+          name="description"
+          rows={4}
+          className="mt-1 block w-full rounded-lg border border-gray-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+          placeholder="Provide context so the group understands what they're voting on..."
+        />
+      </div>
+
+      {/* Format */}
+      <div>
+        <label
+          htmlFor="format"
+          className="block text-sm font-medium text-gray-700"
+        >
+          Suggested Format *
+        </label>
+        <select
+          id="format"
+          name="format"
+          value={format}
+          onChange={(e) => setFormat(e.target.value as VoteFormat)}
+          className="mt-1 block w-full rounded-lg border border-gray-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+        >
+          {Object.entries(VOTE_FORMAT_LABELS).map(([value, label]) => (
+            <option key={value} value={value}>
+              {label}
+            </option>
+          ))}
+        </select>
+        {state.fieldErrors.format && (
+          <p className="mt-1 text-sm text-red-600">
+            {state.fieldErrors.format}
+          </p>
+        )}
+      </div>
+
+      {/* Options (only for multiple_choice and ranked_choice) */}
+      {showOptions && (
+        <div>
+          <label className="block text-sm font-medium text-gray-700">
+            Options *
+          </label>
+          <div className="mt-2 space-y-3">
+            {options.map((opt, idx) => (
+              <div key={idx} className="flex gap-2">
+                <div className="flex-1">
+                  <input
+                    name={`option_label_${idx}`}
+                    type="text"
+                    required
+                    placeholder={`Option ${idx + 1}`}
+                    defaultValue={opt.label}
+                    className="block w-full rounded-lg border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                  />
+                </div>
+                <div className="flex-1">
+                  <input
+                    name={`option_description_${idx}`}
+                    type="text"
+                    placeholder="Description (optional)"
+                    defaultValue={opt.description}
+                    className="block w-full rounded-lg border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                  />
+                </div>
+                {options.length > 2 && (
+                  <button
+                    type="button"
+                    onClick={() => removeOption(idx)}
+                    className="rounded-lg px-2 py-2 text-sm text-red-600 hover:bg-red-50"
+                  >
+                    Remove
+                  </button>
+                )}
+              </div>
+            ))}
+          </div>
+          <button
+            type="button"
+            onClick={addOption}
+            className="mt-2 text-sm font-medium text-blue-600 hover:text-blue-800"
+          >
+            + Add option
+          </button>
+          {state.fieldErrors.options && (
+            <p className="mt-1 text-sm text-red-600">
+              {state.fieldErrors.options}
+            </p>
+          )}
+        </div>
+      )}
+
+      {/* Privacy Level */}
+      <div>
+        <label
+          htmlFor="privacy_level"
+          className="block text-sm font-medium text-gray-700"
+        >
+          Suggested Privacy Level *
+        </label>
+        <select
+          id="privacy_level"
+          name="privacy_level"
+          defaultValue="anonymous"
+          className="mt-1 block w-full rounded-lg border border-gray-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+        >
+          {Object.entries(PRIVACY_LEVEL_LABELS).map(([value, label]) => (
+            <option key={value} value={value}>
+              {label}
+            </option>
+          ))}
+        </select>
+      </div>
+
+      {/* Quorum */}
+      <div>
+        <label
+          htmlFor="quorum_percentage"
+          className="block text-sm font-medium text-gray-700"
+        >
+          Suggested Quorum (%) *
+        </label>
+        <input
+          id="quorum_percentage"
+          name="quorum_percentage"
+          type="number"
+          min={0}
+          max={100}
+          defaultValue={QUORUM_DEFAULT}
+          className="mt-1 block w-32 rounded-lg border border-gray-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+        />
+        {state.fieldErrors.quorum_percentage && (
+          <p className="mt-1 text-sm text-red-600">
+            {state.fieldErrors.quorum_percentage}
+          </p>
+        )}
+      </div>
+
+      {/* Passing Threshold */}
+      <div>
+        <label
+          htmlFor="passing_threshold"
+          className="block text-sm font-medium text-gray-700"
+        >
+          Suggested Passing Threshold *
+        </label>
+        <select
+          id="passing_threshold"
+          name="passing_threshold"
+          defaultValue="simple_majority"
+          onChange={(e) =>
+            setShowCustomThreshold(e.target.value === "custom")
+          }
+          className="mt-1 block w-full rounded-lg border border-gray-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+        >
+          {Object.entries(PASSING_THRESHOLD_LABELS).map(([value, label]) => (
+            <option key={value} value={value}>
+              {label}
+            </option>
+          ))}
+        </select>
+        {state.fieldErrors.passing_threshold && (
+          <p className="mt-1 text-sm text-red-600">
+            {state.fieldErrors.passing_threshold}
+          </p>
+        )}
+      </div>
+
+      {/* Custom Threshold */}
+      {showCustomThreshold && (
+        <div>
+          <label
+            htmlFor="custom_threshold_percentage"
+            className="block text-sm font-medium text-gray-700"
+          >
+            Custom Threshold (%) *
+          </label>
+          <input
+            id="custom_threshold_percentage"
+            name="custom_threshold_percentage"
+            type="number"
+            min={1}
+            max={100}
+            required
+            className="mt-1 block w-32 rounded-lg border border-gray-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+          />
+          {state.fieldErrors.custom_threshold_percentage && (
+            <p className="mt-1 text-sm text-red-600">
+              {state.fieldErrors.custom_threshold_percentage}
+            </p>
+          )}
+        </div>
+      )}
+
+      {/* Submit */}
+      <div className="flex gap-3 border-t pt-6">
+        <button
+          type="submit"
+          disabled={isPending}
+          className="rounded-lg bg-blue-600 px-6 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-blue-500 disabled:opacity-50"
+        >
+          {isPending ? "Submitting..." : "Submit Proposal"}
+        </button>
+        <a
+          href="/dashboard"
+          className="rounded-lg border border-gray-300 px-6 py-2.5 text-sm font-semibold text-gray-700 shadow-sm hover:bg-gray-50"
+        >
+          Cancel
+        </a>
+      </div>
+
+      <p className="text-xs text-gray-500">
+        Your proposal will be reviewed by an admin before going live. The admin
+        may adjust settings before approving.
+      </p>
+    </form>
+  );
+}
+```
+
+3. Create the page wrapper:
+
+```tsx
+// src/app/(protected)/propose/page.tsx
+import { getCurrentMember } from "@/lib/auth";
+import { ProposeForm } from "./propose-form";
+
+export default async function ProposePage() {
+  await getCurrentMember();
+
+  return (
+    <div className="mx-auto max-w-2xl space-y-6">
+      <div>
+        <h1 className="text-2xl font-bold text-gray-900">Propose a Vote</h1>
+        <p className="mt-1 text-sm text-gray-500">
+          Suggest a topic for the group to vote on. An admin will review your
+          proposal before it goes live.
+        </p>
+      </div>
+      <ProposeForm />
+    </div>
+  );
+}
+```
+
+4. Verify the app compiles:
+
+```bash
+cd /Users/briantse/Projects/group-vote
+npm run build
+```
+
+5. Commit:
+
+```bash
+git add "src/app/(protected)/propose/"
+git commit -m "Add member-facing vote proposal form with validation"
+```
+
+---
+
+### Task 6.2 — Admin Proposal Review Queue
+
+**Files:**
+- `/Users/briantse/Projects/group-vote/src/app/(protected)/admin/proposals/page.tsx` (replace placeholder)
+- `/Users/briantse/Projects/group-vote/src/app/(protected)/admin/proposals/proposal-card.tsx` (create)
+
+**Steps:**
+
+1. Build the admin proposals review page that lists pending proposals:
+
+```tsx
+// src/app/(protected)/admin/proposals/page.tsx
+import { requireAdmin } from "@/lib/auth";
+import { createAdminClient } from "@/lib/supabase/admin";
+import { ProposalCard } from "./proposal-card";
+import type { VoteProposal, Member } from "@/lib/types";
+
+export default async function AdminProposalsPage() {
+  await requireAdmin();
+
+  const adminClient = createAdminClient();
+
+  const { data: proposals, error } = await adminClient
+    .from("vote_proposals")
+    .select("*, proposer:members!proposed_by(id, name, email)")
+    .order("created_at", { ascending: true });
+
+  if (error) {
+    throw new Error(`Failed to load proposals: ${error.message}`);
+  }
+
+  const pending = proposals.filter(
+    (p: VoteProposal) => p.status === "pending"
+  );
+  const reviewed = proposals.filter(
+    (p: VoteProposal) => p.status !== "pending"
+  );
+
+  return (
+    <div className="space-y-6">
+      <div>
+        <h1 className="text-2xl font-bold text-gray-900">
+          Review Proposals
+        </h1>
+        <p className="mt-1 text-sm text-gray-500">
+          {pending.length} pending proposal{pending.length !== 1 ? "s" : ""}
+        </p>
+      </div>
+
+      {pending.length === 0 ? (
+        <div className="rounded-lg border bg-white p-8 text-center text-gray-500">
+          No pending proposals.
+        </div>
+      ) : (
+        <div className="space-y-4">
+          {pending.map((proposal: any) => (
+            <ProposalCard key={proposal.id} proposal={proposal} />
+          ))}
+        </div>
+      )}
+
+      {reviewed.length > 0 && (
+        <>
+          <h2 className="text-lg font-semibold text-gray-900">
+            Previously Reviewed
+          </h2>
+          <div className="space-y-4">
+            {reviewed.map((proposal: any) => (
+              <ProposalCard
+                key={proposal.id}
+                proposal={proposal}
+                readonly
+              />
+            ))}
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+```
+
+2. Create the proposal card component with approve/reject/edit actions:
+
+```tsx
+// src/app/(protected)/admin/proposals/proposal-card.tsx
+"use client";
+
+import { useTransition, useState } from "react";
+import {
+  approveProposal,
+  rejectProposal,
+} from "./actions";
+import {
+  VOTE_FORMAT_LABELS,
+  PRIVACY_LEVEL_LABELS,
+  PASSING_THRESHOLD_LABELS,
+} from "@/lib/constants";
+
+interface ProposalCardProps {
+  proposal: {
+    id: string;
+    title: string;
+    description: string | null;
+    format: string;
+    privacy_level: string;
+    options: string;
+    quorum_percentage: number;
+    passing_threshold: string;
+    custom_threshold_percentage: number | null;
+    status: string;
+    admin_notes: string | null;
+    created_at: string;
+    proposer: { id: string; name: string | null; email: string };
+  };
+  readonly?: boolean;
+}
+
+const STATUS_STYLES: Record<string, string> = {
+  pending: "bg-yellow-100 text-yellow-800",
+  approved: "bg-green-100 text-green-800",
+  rejected: "bg-red-100 text-red-800",
+};
+
+export function ProposalCard({ proposal, readonly }: ProposalCardProps) {
+  const [isPending, startTransition] = useTransition();
+  const [showReject, setShowReject] = useState(false);
+  const [rejectNotes, setRejectNotes] = useState("");
+
+  const parsedOptions = (() => {
+    try {
+      return typeof proposal.options === "string"
+        ? JSON.parse(proposal.options)
+        : proposal.options;
+    } catch {
+      return [];
+    }
+  })();
+
+  function handleApprove() {
+    if (!confirm("Approve this proposal and create the vote?")) return;
+    startTransition(() => {
+      approveProposal(proposal.id);
+    });
+  }
+
+  function handleReject() {
+    startTransition(() => {
+      rejectProposal(proposal.id, rejectNotes || null);
+    });
+  }
+
+  return (
+    <div
+      className={`rounded-lg border bg-white p-5 shadow-sm ${
+        isPending ? "opacity-50" : ""
+      }`}
+    >
+      <div className="flex items-start justify-between">
+        <div>
+          <h3 className="text-lg font-semibold text-gray-900">
+            {proposal.title}
+          </h3>
+          <p className="mt-0.5 text-xs text-gray-500">
+            Proposed by {proposal.proposer.name || proposal.proposer.email} on{" "}
+            {new Date(proposal.created_at).toLocaleDateString()}
+          </p>
+        </div>
+        <span
+          className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${
+            STATUS_STYLES[proposal.status] || STATUS_STYLES.pending
+          }`}
+        >
+          {proposal.status}
+        </span>
+      </div>
+
+      {proposal.description && (
+        <p className="mt-3 text-sm text-gray-700">{proposal.description}</p>
+      )}
+
+      <div className="mt-4 grid grid-cols-2 gap-4 text-sm">
+        <div>
+          <span className="font-medium text-gray-500">Format:</span>{" "}
+          {VOTE_FORMAT_LABELS[proposal.format] || proposal.format}
+        </div>
+        <div>
+          <span className="font-medium text-gray-500">Privacy:</span>{" "}
+          {PRIVACY_LEVEL_LABELS[proposal.privacy_level] ||
+            proposal.privacy_level}
+        </div>
+        <div>
+          <span className="font-medium text-gray-500">Quorum:</span>{" "}
+          {proposal.quorum_percentage}%
+        </div>
+        <div>
+          <span className="font-medium text-gray-500">Threshold:</span>{" "}
+          {PASSING_THRESHOLD_LABELS[proposal.passing_threshold] ||
+            proposal.passing_threshold}
+          {proposal.custom_threshold_percentage &&
+            ` (${proposal.custom_threshold_percentage}%)`}
+        </div>
+      </div>
+
+      {parsedOptions.length > 0 && (
+        <div className="mt-3">
+          <span className="text-sm font-medium text-gray-500">Options:</span>
+          <ul className="mt-1 list-inside list-disc text-sm text-gray-700">
+            {parsedOptions.map(
+              (opt: { label: string; description?: string }, idx: number) => (
+                <li key={idx}>
+                  {opt.label}
+                  {opt.description && (
+                    <span className="text-gray-500">
+                      {" "}
+                      — {opt.description}
+                    </span>
+                  )}
+                </li>
+              )
+            )}
+          </ul>
+        </div>
+      )}
+
+      {proposal.admin_notes && (
+        <div className="mt-3 rounded-md bg-gray-50 p-3 text-sm text-gray-600">
+          <span className="font-medium">Admin notes:</span>{" "}
+          {proposal.admin_notes}
+        </div>
+      )}
+
+      {!readonly && proposal.status === "pending" && (
+        <div className="mt-4 flex items-center gap-3 border-t pt-4">
+          <button
+            onClick={handleApprove}
+            disabled={isPending}
+            className="rounded-lg bg-green-600 px-4 py-2 text-sm font-semibold text-white hover:bg-green-500 disabled:opacity-50"
+          >
+            Approve & Create Vote
+          </button>
+          {!showReject ? (
+            <button
+              onClick={() => setShowReject(true)}
+              disabled={isPending}
+              className="rounded-lg border border-red-300 px-4 py-2 text-sm font-semibold text-red-600 hover:bg-red-50 disabled:opacity-50"
+            >
+              Reject
+            </button>
+          ) : (
+            <div className="flex flex-1 items-center gap-2">
+              <input
+                type="text"
+                value={rejectNotes}
+                onChange={(e) => setRejectNotes(e.target.value)}
+                placeholder="Reason (optional)"
+                className="flex-1 rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-red-500 focus:outline-none focus:ring-1 focus:ring-red-500"
+              />
+              <button
+                onClick={handleReject}
+                disabled={isPending}
+                className="rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white hover:bg-red-500 disabled:opacity-50"
+              >
+                Confirm Reject
+              </button>
+              <button
+                onClick={() => setShowReject(false)}
+                className="text-sm text-gray-500 hover:text-gray-700"
+              >
+                Cancel
+              </button>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+```
+
+3. Commit (combined with Task 6.3).
+
+---
+
+### Task 6.3 — Proposal Review Server Actions
+
+**Files:**
+- `/Users/briantse/Projects/group-vote/src/app/(protected)/admin/proposals/actions.ts` (create)
+
+**Steps:**
+
+1. Create server actions for approving, rejecting, and editing proposals. The approve action creates a full vote from the proposal data:
+
+```ts
+// src/app/(protected)/admin/proposals/actions.ts
+"use server";
+
+import { requireAdmin } from "@/lib/auth";
+import { createAdminClient } from "@/lib/supabase/admin";
+import { revalidatePath } from "next/cache";
+
+export async function approveProposal(proposalId: string) {
+  const admin = await requireAdmin();
+  const adminClient = createAdminClient();
+
+  // Fetch the proposal
+  const { data: proposal, error: fetchError } = await adminClient
+    .from("vote_proposals")
+    .select("*")
+    .eq("id", proposalId)
+    .single();
+
+  if (fetchError || !proposal) {
+    throw new Error(
+      `Failed to fetch proposal: ${fetchError?.message || "Not found"}`
+    );
+  }
+
+  if (proposal.status !== "pending") {
+    throw new Error("This proposal has already been reviewed.");
+  }
+
+  // Parse options from the proposal JSON
+  const proposalOptions = (() => {
+    try {
+      return typeof proposal.options === "string"
+        ? JSON.parse(proposal.options)
+        : proposal.options;
+    } catch {
+      return [];
+    }
+  })();
+
+  // Create the vote from proposal data
+  const { data: vote, error: voteError } = await adminClient
+    .from("votes")
+    .insert({
+      title: proposal.title,
+      description: proposal.description,
+      format: proposal.format,
+      privacy_level: proposal.privacy_level,
+      status: "draft",
+      quorum_percentage: proposal.quorum_percentage,
+      passing_threshold: proposal.passing_threshold,
+      custom_threshold_percentage: proposal.custom_threshold_percentage,
+      created_by: admin.id,
+    })
+    .select("id")
+    .single();
+
+  if (voteError || !vote) {
+    throw new Error(
+      `Failed to create vote from proposal: ${voteError?.message || "Unknown error"}`
+    );
+  }
+
+  // Insert vote options
+  const optionsToInsert =
+    proposal.format === "yes_no"
+      ? [
+          { vote_id: vote.id, label: "Yes", display_order: 0 },
+          { vote_id: vote.id, label: "No", display_order: 1 },
+        ]
+      : proposalOptions.map(
+          (
+            opt: { label: string; description: string | null },
+            idx: number
+          ) => ({
+            vote_id: vote.id,
+            label: opt.label,
+            description: opt.description,
+            display_order: idx,
+          })
+        );
+
+  const { error: optionsError } = await adminClient
+    .from("vote_options")
+    .insert(optionsToInsert);
+
+  if (optionsError) {
+    // Clean up the vote if options failed
+    await adminClient.from("votes").delete().eq("id", vote.id);
+    throw new Error(
+      `Failed to create vote options: ${optionsError.message}`
+    );
+  }
+
+  // Mark proposal as approved
+  const { error: updateError } = await adminClient
+    .from("vote_proposals")
+    .update({
+      status: "approved",
+      reviewed_at: new Date().toISOString(),
+    })
+    .eq("id", proposalId);
+
+  if (updateError) {
+    throw new Error(
+      `Vote created but failed to update proposal status: ${updateError.message}`
+    );
+  }
+
+  revalidatePath("/admin/proposals");
+  revalidatePath("/admin/votes");
+}
+
+export async function rejectProposal(
+  proposalId: string,
+  adminNotes: string | null
+) {
+  await requireAdmin();
+  const adminClient = createAdminClient();
+
+  const { error } = await adminClient
+    .from("vote_proposals")
+    .update({
+      status: "rejected",
+      admin_notes: adminNotes,
+      reviewed_at: new Date().toISOString(),
+    })
+    .eq("id", proposalId);
+
+  if (error) {
+    throw new Error(`Failed to reject proposal: ${error.message}`);
+  }
+
+  revalidatePath("/admin/proposals");
+}
+```
+
+2. Verify the app compiles:
+
+```bash
+cd /Users/briantse/Projects/group-vote
+npm run build
+```
+
+3. Commit:
+
+```bash
+git add "src/app/(protected)/admin/proposals/"
+git commit -m "Add admin proposal review queue with approve/reject actions"
+```
+
+---## Phase 7: Voting Mechanics
+
+### Task 7.1 — Voting UI Components
+
+**Files:**
+- `/Users/briantse/Projects/group-vote/src/components/ballot/yes-no-ballot.tsx` (create)
+- `/Users/briantse/Projects/group-vote/src/components/ballot/multiple-choice-ballot.tsx` (create)
+- `/Users/briantse/Projects/group-vote/src/components/ballot/ranked-choice-ballot.tsx` (create)
+- `/Users/briantse/Projects/group-vote/src/components/ballot/ballot-wrapper.tsx` (create)
+- `/Users/briantse/Projects/group-vote/package.json` (modified — add @dnd-kit)
+
+**Steps:**
+
+1. Install `@dnd-kit/core` and `@dnd-kit/sortable` for the ranked choice drag-to-reorder:
+
+```bash
+cd /Users/briantse/Projects/group-vote
+npm install @dnd-kit/core @dnd-kit/sortable @dnd-kit/utilities
+```
+
+2. Create the Yes/No ballot component:
+
+```tsx
+// src/components/ballot/yes-no-ballot.tsx
+"use client";
+
+import type { VoteOption } from "@/lib/types";
+
+interface YesNoBallotProps {
+  options: VoteOption[];
+  currentChoice: string | null;
+  onVote: (optionId: string) => void;
+  disabled: boolean;
+}
+
+export function YesNoBallot({
+  options,
+  currentChoice,
+  onVote,
+  disabled,
+}: YesNoBallotProps) {
+  const yesOption = options.find((o) => o.label === "Yes");
+  const noOption = options.find((o) => o.label === "No");
+
+  if (!yesOption || !noOption) {
+    return <p className="text-sm text-red-600">Invalid vote options.</p>;
+  }
+
+  return (
+    <div className="flex gap-4">
+      <button
+        onClick={() => onVote(yesOption.id)}
+        disabled={disabled}
+        className={`flex-1 rounded-lg border-2 px-6 py-4 text-lg font-semibold transition-colors disabled:opacity-50 ${
+          currentChoice === yesOption.id
+            ? "border-green-600 bg-green-50 text-green-700"
+            : "border-gray-200 bg-white text-gray-700 hover:border-green-300 hover:bg-green-50"
+        }`}
+      >
+        Yes
+        {currentChoice === yesOption.id && (
+          <span className="ml-2 text-sm font-normal">(your vote)</span>
+        )}
+      </button>
+      <button
+        onClick={() => onVote(noOption.id)}
+        disabled={disabled}
+        className={`flex-1 rounded-lg border-2 px-6 py-4 text-lg font-semibold transition-colors disabled:opacity-50 ${
+          currentChoice === noOption.id
+            ? "border-red-600 bg-red-50 text-red-700"
+            : "border-gray-200 bg-white text-gray-700 hover:border-red-300 hover:bg-red-50"
+        }`}
+      >
+        No
+        {currentChoice === noOption.id && (
+          <span className="ml-2 text-sm font-normal">(your vote)</span>
+        )}
+      </button>
+    </div>
+  );
+}
+```
+
+3. Create the Multiple Choice ballot component:
+
+```tsx
+// src/components/ballot/multiple-choice-ballot.tsx
+"use client";
+
+import type { VoteOption } from "@/lib/types";
+
+interface MultipleChoiceBallotProps {
+  options: VoteOption[];
+  currentChoice: string | null;
+  onVote: (optionId: string) => void;
+  disabled: boolean;
+}
+
+export function MultipleChoiceBallot({
+  options,
+  currentChoice,
+  onVote,
+  disabled,
+}: MultipleChoiceBallotProps) {
+  return (
+    <div className="space-y-2">
+      {options.map((option) => (
+        <button
+          key={option.id}
+          onClick={() => onVote(option.id)}
+          disabled={disabled}
+          className={`flex w-full items-center gap-3 rounded-lg border-2 px-4 py-3 text-left transition-colors disabled:opacity-50 ${
+            currentChoice === option.id
+              ? "border-blue-600 bg-blue-50"
+              : "border-gray-200 bg-white hover:border-blue-300 hover:bg-blue-50"
+          }`}
+        >
+          <div
+            className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full border-2 ${
+              currentChoice === option.id
+                ? "border-blue-600 bg-blue-600"
+                : "border-gray-300"
+            }`}
+          >
+            {currentChoice === option.id && (
+              <div className="h-2 w-2 rounded-full bg-white" />
+            )}
+          </div>
+          <div>
+            <span
+              className={`font-medium ${
+                currentChoice === option.id
+                  ? "text-blue-700"
+                  : "text-gray-900"
+              }`}
+            >
+              {option.label}
+            </span>
+            {option.description && (
+              <p className="mt-0.5 text-sm text-gray-500">
+                {option.description}
+              </p>
+            )}
+          </div>
+          {currentChoice === option.id && (
+            <span className="ml-auto text-xs font-medium text-blue-600">
+              Your vote
+            </span>
+          )}
+        </button>
+      ))}
+    </div>
+  );
+}
+```
+
+4. Create the Ranked Choice ballot component with drag-to-reorder using `@dnd-kit`:
+
+```tsx
+// src/components/ballot/ranked-choice-ballot.tsx
+"use client";
+
+import { useState } from "react";
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+} from "@dnd-kit/core";
+import {
+  arrayMove,
+  SortableContext,
+  sortableKeyboardCoordinates,
+  useSortable,
+  verticalListSortingStrategy,
+} from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
+import type { VoteOption } from "@/lib/types";
+
+interface RankedChoiceBallotProps {
+  options: VoteOption[];
+  currentRanking: string[] | null;
+  onVote: (rankedOptionIds: string[]) => void;
+  disabled: boolean;
+}
+
+function SortableItem({
+  option,
+  rank,
+}: {
+  option: VoteOption;
+  rank: number;
+}) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id: option.id });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+  };
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={style}
+      className={`flex items-center gap-3 rounded-lg border-2 bg-white px-4 py-3 ${
+        isDragging
+          ? "z-10 border-blue-400 shadow-lg"
+          : "border-gray-200"
+      }`}
+    >
+      <div
+        {...attributes}
+        {...listeners}
+        className="flex h-8 w-8 shrink-0 cursor-grab items-center justify-center rounded bg-gray-100 text-gray-400 active:cursor-grabbing"
+        aria-label={`Drag to reorder ${option.label}`}
+      >
+        <svg
+          className="h-4 w-4"
+          fill="none"
+          viewBox="0 0 24 24"
+          stroke="currentColor"
+          strokeWidth={2}
+        >
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            d="M4 8h16M4 16h16"
+          />
+        </svg>
+      </div>
+      <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-blue-100 text-sm font-bold text-blue-700">
+        {rank}
+      </div>
+      <div className="flex-1">
+        <span className="font-medium text-gray-900">{option.label}</span>
+        {option.description && (
+          <p className="mt-0.5 text-sm text-gray-500">
+            {option.description}
+          </p>
+        )}
+      </div>
+    </div>
+  );
+}
+
+export function RankedChoiceBallot({
+  options,
+  currentRanking,
+  onVote,
+  disabled,
+}: RankedChoiceBallotProps) {
+  // Initialize ordering: use current ranking if it exists, otherwise display order
+  const [orderedIds, setOrderedIds] = useState<string[]>(() => {
+    if (currentRanking && currentRanking.length === options.length) {
+      return currentRanking;
+    }
+    return [...options]
+      .sort((a, b) => a.display_order - b.display_order)
+      .map((o) => o.id);
+  });
+
+  const sensors = useSensors(
+    useSensor(PointerSensor),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    })
+  );
+
+  function handleDragEnd(event: DragEndEvent) {
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
+
+    const oldIndex = orderedIds.indexOf(active.id as string);
+    const newIndex = orderedIds.indexOf(over.id as string);
+    const newOrder = arrayMove(orderedIds, oldIndex, newIndex);
+    setOrderedIds(newOrder);
+  }
+
+  const orderedOptions = orderedIds.map(
+    (id) => options.find((o) => o.id === id)!
+  );
+
+  const hasChanged =
+    currentRanking &&
+    JSON.stringify(orderedIds) !== JSON.stringify(currentRanking);
+
+  return (
+    <div className="space-y-4">
+      <p className="text-sm text-gray-600">
+        Drag and drop to rank your preferences. #1 is your top choice.
+      </p>
+
+      <DndContext
+        sensors={sensors}
+        collisionDetection={closestCenter}
+        onDragEnd={handleDragEnd}
+      >
+        <SortableContext
+          items={orderedIds}
+          strategy={verticalListSortingStrategy}
+        >
+          <div className="space-y-2">
+            {orderedOptions.map((option, index) => (
+              <SortableItem
+                key={option.id}
+                option={option}
+                rank={index + 1}
+              />
+            ))}
+          </div>
+        </SortableContext>
+      </DndContext>
+
+      <button
+        onClick={() => onVote(orderedIds)}
+        disabled={disabled}
+        className="w-full rounded-lg bg-blue-600 px-6 py-3 text-sm font-semibold text-white shadow-sm hover:bg-blue-500 disabled:opacity-50"
+      >
+        {currentRanking ? "Update Ranking" : "Submit Ranking"}
+      </button>
+
+      {currentRanking && !hasChanged && (
+        <p className="text-center text-sm text-green-600">
+          This is your current ranking.
+        </p>
+      )}
+    </div>
+  );
+}
+```
+
+5. Create the ballot wrapper that selects the correct component based on vote format:
+
+```tsx
+// src/components/ballot/ballot-wrapper.tsx
+"use client";
+
+import { useTransition, useState, useCallback } from "react";
+import { castVote, changeVote } from "@/lib/actions/vote-actions";
+import { YesNoBallot } from "./yes-no-ballot";
+import { MultipleChoiceBallot } from "./multiple-choice-ballot";
+import { RankedChoiceBallot } from "./ranked-choice-ballot";
+import type { VoteOption, VoteFormat, PrivacyLevel } from "@/lib/types";
+
+interface BallotWrapperProps {
+  voteId: string;
+  format: VoteFormat;
+  privacyLevel: PrivacyLevel;
+  options: VoteOption[];
+  existingChoice: string | null;
+  existingRanking: string[] | null;
+  hasVoted: boolean;
+  sessionToken: string | null;
+}
+
+export function BallotWrapper({
+  voteId,
+  format,
+  privacyLevel,
+  options,
+  existingChoice,
+  existingRanking,
+  hasVoted,
+  sessionToken,
+}: BallotWrapperProps) {
+  const [isPending, startTransition] = useTransition();
+  const [error, setError] = useState<string | null>(null);
+  const [currentChoice, setCurrentChoice] = useState<string | null>(
+    existingChoice
+  );
+  const [currentRanking, setCurrentRanking] = useState<string[] | null>(
+    existingRanking
+  );
+
+  const handleVote = useCallback(
+    (choice: string | string[]) => {
+      setError(null);
+      startTransition(async () => {
+        try {
+          const choicePayload =
+            typeof choice === "string"
+              ? { option_id: choice }
+              : { ranked: choice };
+
+          if (hasVoted) {
+            await changeVote({
+              voteId,
+              choice: choicePayload,
+              privacyLevel,
+              sessionToken,
+            });
+          } else {
+            await castVote({
+              voteId,
+              choice: choicePayload,
+              privacyLevel,
+            });
+          }
+
+          // Update local state
+          if (typeof choice === "string") {
+            setCurrentChoice(choice);
+          } else {
+            setCurrentRanking(choice);
+          }
+        } catch (err) {
+          setError(
+            err instanceof Error ? err.message : "Failed to cast vote."
+          );
+        }
+      });
+    },
+    [voteId, privacyLevel, hasVoted, sessionToken]
+  );
+
+  return (
+    <div className="space-y-4">
+      {hasVoted && (
+        <div className="rounded-lg bg-green-50 px-4 py-3 text-sm text-green-700">
+          You have already voted. You can change your vote below.
+        </div>
+      )}
+
+      {error && (
+        <div className="rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700">
+          {error}
+        </div>
+      )}
+
+      {format === "yes_no" && (
+        <YesNoBallot
+          options={options}
+          currentChoice={currentChoice}
+          onVote={(optionId) => handleVote(optionId)}
+          disabled={isPending}
+        />
+      )}
+
+      {format === "multiple_choice" && (
+        <MultipleChoiceBallot
+          options={options}
+          currentChoice={currentChoice}
+          onVote={(optionId) => handleVote(optionId)}
+          disabled={isPending}
+        />
+      )}
+
+      {format === "ranked_choice" && (
+        <RankedChoiceBallot
+          options={options}
+          currentRanking={currentRanking}
+          onVote={(rankedIds) => handleVote(rankedIds)}
+          disabled={isPending}
+        />
+      )}
+
+      {isPending && (
+        <p className="text-center text-sm text-gray-500">
+          Submitting your vote...
+        </p>
+      )}
+    </div>
+  );
+}
+```
+
+6. Commit (combined with Tasks 7.2–7.4).
+
+---
+
+### Task 7.2 — Cast Vote Server Action
+
+**Files:**
+- `/Users/briantse/Projects/group-vote/src/lib/actions/vote-actions.ts` (create)
+
+**Steps:**
+
+1. Create the `castVote` server action. This is the core voting logic. For anonymous votes, it inserts a participation record (with `member_id`) and a ballot record (WITHOUT `member_id`) as two separate operations. For non-anonymous votes, it inserts a single ballot record with `member_id`:
+
+```ts
+// src/lib/actions/vote-actions.ts
+"use server";
+
+import { getCurrentMember } from "@/lib/auth";
+import { createAdminClient } from "@/lib/supabase/admin";
+import { revalidatePath } from "next/cache";
+import { cookies } from "next/headers";
+import type { PrivacyLevel } from "@/lib/types";
+
+interface CastVoteInput {
+  voteId: string;
+  choice: { option_id: string } | { ranked: string[] };
+  privacyLevel: PrivacyLevel;
+}
+
+interface ChangeVoteInput extends CastVoteInput {
+  sessionToken: string | null;
+}
+
+/**
+ * Cast a vote for the first time.
+ *
+ * Anonymous votes:
+ *   1. Insert a participation record (member_id + vote_id) — tracks WHO voted
+ *   2. Insert a ballot record (vote_id + choice, NO member_id) — tracks the CHOICE
+ *   3. Store a temporary session token in a cookie so the member can change
+ *      their anonymous ballot later (the cookie maps to the ballot row id)
+ *
+ * Non-anonymous votes:
+ *   1. Insert a single ballot_records_named row with member_id + choice
+ *   2. Insert a participation record for consistency
+ */
+export async function castVote(input: CastVoteInput): Promise<void> {
+  const member = await getCurrentMember();
+  const adminClient = createAdminClient();
+
+  // Verify the vote is open
+  const { data: vote, error: voteError } = await adminClient
+    .from("votes")
+    .select("id, status, privacy_level")
+    .eq("id", input.voteId)
+    .single();
+
+  if (voteError || !vote) {
+    throw new Error("Vote not found.");
+  }
+
+  if (vote.status !== "open") {
+    throw new Error("This vote is not currently open.");
+  }
+
+  // Check member hasn't already voted
+  const { data: existing } = await adminClient
+    .from("participation_records")
+    .select("id")
+    .eq("vote_id", input.voteId)
+    .eq("member_id", member.id)
+    .single();
+
+  if (existing) {
+    throw new Error(
+      "You have already voted. Use the change vote option instead."
+    );
+  }
+
+  if (input.privacyLevel === "anonymous") {
+    // --- ANONYMOUS VOTE: two separate inserts ---
+
+    // 1. Insert participation record (WHO voted — no choice info)
+    const { error: partError } = await adminClient
+      .from("participation_records")
+      .insert({
+        vote_id: input.voteId,
+        member_id: member.id,
+      });
+
+    if (partError) {
+      throw new Error(`Failed to record participation: ${partError.message}`);
+    }
+
+    // 2. Insert anonymous ballot (WHAT was chosen — no member info)
+    const { data: ballot, error: ballotError } = await adminClient
+      .from("ballot_records_anonymous")
+      .insert({
+        vote_id: input.voteId,
+        choice: input.choice,
+      })
+      .select("id")
+      .single();
+
+    if (ballotError) {
+      // Roll back participation if ballot failed
+      await adminClient
+        .from("participation_records")
+        .delete()
+        .eq("vote_id", input.voteId)
+        .eq("member_id", member.id);
+      throw new Error(`Failed to cast ballot: ${ballotError.message}`);
+    }
+
+    // 3. Store ballot ID in a cookie so the member can change their vote later.
+    //    This is the ONLY link between the member and the anonymous ballot,
+    //    and it exists only in the member's browser session.
+    const cookieStore = await cookies();
+    cookieStore.set(
+      `ballot_token_${input.voteId}`,
+      ballot.id,
+      {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === "production",
+        sameSite: "strict",
+        maxAge: 60 * 60 * 24 * 90, // 90 days
+        path: "/",
+      }
+    );
+  } else {
+    // --- NON-ANONYMOUS VOTE: single insert with member_id ---
+
+    // 1. Insert named ballot
+    const { error: ballotError } = await adminClient
+      .from("ballot_records_named")
+      .insert({
+        vote_id: input.voteId,
+        member_id: member.id,
+        choice: input.choice,
+      });
+
+    if (ballotError) {
+      throw new Error(`Failed to cast ballot: ${ballotError.message}`);
+    }
+
+    // 2. Insert participation record
+    const { error: partError } = await adminClient
+      .from("participation_records")
+      .insert({
+        vote_id: input.voteId,
+        member_id: member.id,
+      });
+
+    if (partError) {
+      // Ballot was cast — log but don't fail. Participation is secondary.
+      console.error(
+        `Failed to record participation for named vote: ${partError.message}`
+      );
+    }
+  }
+
+  revalidatePath(`/votes/${input.voteId}`);
+}
+
+/**
+ * Change an existing vote.
+ *
+ * Anonymous votes:
+ *   - Use the session token (cookie) to find the old ballot row
+ *   - Delete the old anonymous ballot
+ *   - Insert a new anonymous ballot with the new choice
+ *   - Update the cookie with the new ballot ID
+ *   - Update the participation record's updated_at timestamp
+ *
+ * Non-anonymous votes:
+ *   - Update the existing ballot_records_named row in place
+ *   - Update the participation record's updated_at timestamp
+ */
+export async function changeVote(input: ChangeVoteInput): Promise<void> {
+  const member = await getCurrentMember();
+  const adminClient = createAdminClient();
+
+  // Verify the vote is open
+  const { data: vote, error: voteError } = await adminClient
+    .from("votes")
+    .select("id, status, privacy_level")
+    .eq("id", input.voteId)
+    .single();
+
+  if (voteError || !vote) {
+    throw new Error("Vote not found.");
+  }
+
+  if (vote.status !== "open") {
+    throw new Error("This vote is closed — you can no longer change your vote.");
+  }
+
+  if (input.privacyLevel === "anonymous") {
+    // --- ANONYMOUS VOTE CHANGE ---
+
+    // Retrieve the ballot ID from the cookie
+    const cookieStore = await cookies();
+    const ballotId = cookieStore.get(`ballot_token_${input.voteId}`)?.value;
+
+    if (!ballotId) {
+      throw new Error(
+        "Unable to identify your previous anonymous ballot. " +
+        "This can happen if you cleared your cookies or are using a different browser."
+      );
+    }
+
+    // Verify the old ballot exists
+    const { data: oldBallot } = await adminClient
+      .from("ballot_records_anonymous")
+      .select("id")
+      .eq("id", ballotId)
+      .eq("vote_id", input.voteId)
+      .single();
+
+    if (!oldBallot) {
+      throw new Error(
+        "Previous ballot not found. It may have already been removed."
+      );
+    }
+
+    // Delete the old anonymous ballot
+    const { error: deleteError } = await adminClient
+      .from("ballot_records_anonymous")
+      .delete()
+      .eq("id", ballotId);
+
+    if (deleteError) {
+      throw new Error(`Failed to remove old ballot: ${deleteError.message}`);
+    }
+
+    // Insert new anonymous ballot
+    const { data: newBallot, error: insertError } = await adminClient
+      .from("ballot_records_anonymous")
+      .insert({
+        vote_id: input.voteId,
+        choice: input.choice,
+      })
+      .select("id")
+      .single();
+
+    if (insertError) {
+      throw new Error(`Failed to cast new ballot: ${insertError.message}`);
+    }
+
+    // Update the cookie with the new ballot ID
+    cookieStore.set(
+      `ballot_token_${input.voteId}`,
+      newBallot.id,
+      {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === "production",
+        sameSite: "strict",
+        maxAge: 60 * 60 * 24 * 90,
+        path: "/",
+      }
+    );
+
+    // Update participation timestamp
+    await adminClient
+      .from("participation_records")
+      .update({ updated_at: new Date().toISOString() })
+      .eq("vote_id", input.voteId)
+      .eq("member_id", member.id);
+  } else {
+    // --- NON-ANONYMOUS VOTE CHANGE: update in place ---
+
+    const { error: updateError } = await adminClient
+      .from("ballot_records_named")
+      .update({
+        choice: input.choice,
+        cast_at: new Date().toISOString(),
+      })
+      .eq("vote_id", input.voteId)
+      .eq("member_id", member.id);
+
+    if (updateError) {
+      throw new Error(`Failed to update vote: ${updateError.message}`);
+    }
+
+    // Update participation timestamp
+    await adminClient
+      .from("participation_records")
+      .update({ updated_at: new Date().toISOString() })
+      .eq("vote_id", input.voteId)
+      .eq("member_id", member.id);
+  }
+
+  revalidatePath(`/votes/${input.voteId}`);
+}
+```
+
+2. Commit (combined with Tasks 7.3 and 7.4).
+
+---
+
+### Task 7.3 — Integrate Ballot into Vote Detail Page
+
+**Files:**
+- `/Users/briantse/Projects/group-vote/src/app/(protected)/votes/[id]/page.tsx` (modify)
+
+**Steps:**
+
+1. Update the vote detail page to detect existing votes and render the appropriate ballot component. Replace the placeholder div that reads "Ballot casting will be implemented in Phase 6" with the real ballot:
+
+```tsx
+// src/app/(protected)/votes/[id]/page.tsx
+import { getCurrentMember } from "@/lib/auth";
+import { createAdminClient } from "@/lib/supabase/admin";
+import { notFound } from "next/navigation";
+import { cookies } from "next/headers";
+import { BallotWrapper } from "@/components/ballot/ballot-wrapper";
+import { ParticipationBar } from "@/components/participation-bar";
+import {
+  VOTE_FORMAT_LABELS,
+  PRIVACY_LEVEL_LABELS,
+  PASSING_THRESHOLD_LABELS,
+} from "@/lib/constants";
+import type { Vote, VoteOption } from "@/lib/types";
+
+export default async function VoteDetailPage({
+  params,
+}: {
+  params: Promise<{ id: string }>;
+}) {
+  const { id } = await params;
+  const member = await getCurrentMember();
+  const adminClient = createAdminClient();
+
+  // Fetch the vote with its options
+  const { data: vote, error } = await adminClient
+    .from("votes")
+    .select("*")
+    .eq("id", id)
+    .single();
+
+  if (error || !vote) {
+    notFound();
+  }
+
+  const typedVote = vote as Vote;
+
+  const { data: options } = await adminClient
+    .from("vote_options")
+    .select("*")
+    .eq("vote_id", id)
+    .order("display_order", { ascending: true });
+
+  const typedOptions = (options || []) as VoteOption[];
+
+  // Check participation counts
+  const { count: participationCount } = await adminClient
+    .from("participation_records")
+    .select("*", { count: "exact", head: true })
+    .eq("vote_id", id);
+
+  const { count: totalMembers } = await adminClient
+    .from("members")
+    .select("*", { count: "exact", head: true })
+    .eq("active", true);
+
+  // Check if current member has already voted
+  const { data: participation } = await adminClient
+    .from("participation_records")
+    .select("id")
+    .eq("vote_id", id)
+    .eq("member_id", member.id)
+    .single();
+
+  const hasVoted = !!participation;
+
+  // Get existing choice for display
+  let existingChoice: string | null = null;
+  let existingRanking: string[] | null = null;
+  let sessionToken: string | null = null;
+
+  if (hasVoted) {
+    if (typedVote.privacy_level === "anonymous") {
+      // For anonymous votes, get the ballot ID from the cookie
+      const cookieStore = await cookies();
+      const ballotId = cookieStore.get(`ballot_token_${id}`)?.value || null;
+      sessionToken = ballotId;
+
+      if (ballotId) {
+        const { data: ballot } = await adminClient
+          .from("ballot_records_anonymous")
+          .select("choice")
+          .eq("id", ballotId)
+          .single();
+
+        if (ballot) {
+          const choice = ballot.choice as any;
+          if (choice.option_id) existingChoice = choice.option_id;
+          if (choice.ranked) existingRanking = choice.ranked;
+        }
+      }
+    } else {
+      // For non-anonymous votes, query by member_id
+      const { data: ballot } = await adminClient
+        .from("ballot_records_named")
+        .select("choice")
+        .eq("vote_id", id)
+        .eq("member_id", member.id)
+        .single();
+
+      if (ballot) {
+        const choice = ballot.choice as any;
+        if (choice.option_id) existingChoice = choice.option_id;
+        if (choice.ranked) existingRanking = choice.ranked;
+      }
+    }
+  }
+
+  return (
+    <div className="mx-auto max-w-2xl space-y-6">
+      <div>
+        <h1 className="text-2xl font-bold text-gray-900">{typedVote.title}</h1>
+        {typedVote.description && (
+          <p className="mt-2 text-gray-600">{typedVote.description}</p>
+        )}
+      </div>
+
+      {/* Config summary */}
+      <div className="flex flex-wrap gap-3 text-sm text-gray-500">
+        <span className="rounded-full bg-gray-100 px-3 py-1">
+          {VOTE_FORMAT_LABELS[typedVote.format]}
+        </span>
+        <span className="rounded-full bg-gray-100 px-3 py-1">
+          {PRIVACY_LEVEL_LABELS[typedVote.privacy_level]}
+        </span>
+        <span className="rounded-full bg-gray-100 px-3 py-1">
+          Quorum: {typedVote.quorum_percentage}%
+        </span>
+        <span className="rounded-full bg-gray-100 px-3 py-1">
+          {PASSING_THRESHOLD_LABELS[typedVote.passing_threshold]}
+          {typedVote.custom_threshold_percentage &&
+            ` (${typedVote.custom_threshold_percentage}%)`}
+        </span>
+        {typedVote.deadline && (
+          <span className="rounded-full bg-gray-100 px-3 py-1">
+            Deadline: {new Date(typedVote.deadline).toLocaleString()}
+          </span>
+        )}
+      </div>
+
+      {/* Participation bar */}
+      <ParticipationBar
+        voteId={id}
+        initialVoted={participationCount || 0}
+        totalMembers={totalMembers || 0}
+      />
+
+      {/* Ballot or results */}
+      {typedVote.status === "open" && (
+        <BallotWrapper
+          voteId={id}
+          format={typedVote.format}
+          privacyLevel={typedVote.privacy_level}
+          options={typedOptions}
+          existingChoice={existingChoice}
+          existingRanking={existingRanking}
+          hasVoted={hasVoted}
+          sessionToken={sessionToken}
+        />
+      )}
+
+      {typedVote.status === "closed" && (
+        <div className="rounded-lg border bg-gray-50 p-6 text-center">
+          <p className="text-gray-500">
+            This vote is closed.{" "}
+            <a
+              href={`/votes/${id}/results`}
+              className="font-medium text-blue-600 hover:text-blue-800"
+            >
+              View results
+            </a>
+          </p>
+        </div>
+      )}
+    </div>
+  );
+}
+```
+
+2. Commit (combined with Task 7.4).
+
+---
+
+### Task 7.4 — Live Participation Progress Bar
+
+**Files:**
+- `/Users/briantse/Projects/group-vote/src/components/participation-bar.tsx` (create)
+
+**Steps:**
+
+1. Create a participation progress bar component that shows "X of Y have voted" and auto-refreshes. It does NOT reveal any vote results:
+
+```tsx
+// src/components/participation-bar.tsx
+"use client";
+
+import { useEffect, useState } from "react";
+import { createClient } from "@/lib/supabase/client";
+
+interface ParticipationBarProps {
+  voteId: string;
+  initialVoted: number;
+  totalMembers: number;
+}
+
+export function ParticipationBar({
+  voteId,
+  initialVoted,
+  totalMembers,
+}: ParticipationBarProps) {
+  const [voted, setVoted] = useState(initialVoted);
+
+  useEffect(() => {
+    const supabase = createClient();
+
+    // Subscribe to real-time participation changes
+    const channel = supabase
+      .channel(`participation_${voteId}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "INSERT",
+          schema: "public",
+          table: "participation_records",
+          filter: `vote_id=eq.${voteId}`,
+        },
+        () => {
+          setVoted((prev) => prev + 1);
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [voteId]);
+
+  const percentage =
+    totalMembers > 0 ? Math.round((voted / totalMembers) * 100) : 0;
+
+  return (
+    <div className="rounded-lg border bg-white p-4">
+      <div className="flex items-center justify-between text-sm">
+        <span className="font-medium text-gray-700">Participation</span>
+        <span className="text-gray-500">
+          {voted} of {totalMembers} have voted ({percentage}%)
+        </span>
+      </div>
+      <div className="mt-2 h-3 w-full overflow-hidden rounded-full bg-gray-200">
+        <div
+          className="h-full rounded-full bg-blue-600 transition-all duration-500"
+          style={{ width: `${percentage}%` }}
+        />
+      </div>
+    </div>
+  );
+}
+```
+
+2. Verify the app compiles:
+
+```bash
+cd /Users/briantse/Projects/group-vote
+npm run build
+```
+
+3. Commit:
+
+```bash
+git add src/components/ballot/ src/components/participation-bar.tsx src/lib/actions/vote-actions.ts "src/app/(protected)/votes/[id]/page.tsx" package.json package-lock.json
+git commit -m "Implement voting mechanics: ballot UIs, cast/change vote actions, participation bar"
+```
+
+---## Phase 8: Results & Tallying
+
+### Task 8.1 — Vote Closing Logic
+
+**Files:**
+- `/Users/briantse/Projects/group-vote/src/lib/actions/vote-admin-actions.ts` (create)
+- `/Users/briantse/Projects/group-vote/src/app/api/cron/close-votes/route.ts` (create)
+- `/Users/briantse/Projects/group-vote/vercel.json` (create)
+
+**Steps:**
+
+1. Create server actions for admin vote management including manual close and opening:
+
+```ts
+// src/lib/actions/vote-admin-actions.ts
+"use server";
+
+import { requireAdmin } from "@/lib/auth";
+import { createAdminClient } from "@/lib/supabase/admin";
+import { revalidatePath } from "next/cache";
+
+/**
+ * Open a vote — changes status from draft to open and records the opened_at timestamp.
+ */
+export async function openVote(voteId: string): Promise<void> {
+  await requireAdmin();
+  const adminClient = createAdminClient();
+
+  const { data: vote, error: fetchError } = await adminClient
+    .from("votes")
+    .select("id, status")
+    .eq("id", voteId)
+    .single();
+
+  if (fetchError || !vote) {
+    throw new Error("Vote not found.");
+  }
+
+  if (vote.status !== "draft") {
+    throw new Error(`Cannot open a vote with status "${vote.status}".`);
+  }
+
+  const { error } = await adminClient
+    .from("votes")
+    .update({
+      status: "open",
+      opened_at: new Date().toISOString(),
+    })
+    .eq("id", voteId);
+
+  if (error) {
+    throw new Error(`Failed to open vote: ${error.message}`);
+  }
+
+  revalidatePath(`/votes/${voteId}`);
+  revalidatePath("/admin/votes");
+  revalidatePath("/dashboard");
+}
+
+/**
+ * Manually close a vote — changes status from open to closed.
+ */
+export async function closeVote(voteId: string): Promise<void> {
+  await requireAdmin();
+  const adminClient = createAdminClient();
+
+  const { data: vote, error: fetchError } = await adminClient
+    .from("votes")
+    .select("id, status")
+    .eq("id", voteId)
+    .single();
+
+  if (fetchError || !vote) {
+    throw new Error("Vote not found.");
+  }
+
+  if (vote.status !== "open") {
+    throw new Error(`Cannot close a vote with status "${vote.status}".`);
+  }
+
+  const { error } = await adminClient
+    .from("votes")
+    .update({
+      status: "closed",
+      closed_at: new Date().toISOString(),
+    })
+    .eq("id", voteId);
+
+  if (error) {
+    throw new Error(`Failed to close vote: ${error.message}`);
+  }
+
+  revalidatePath(`/votes/${voteId}`);
+  revalidatePath("/admin/votes");
+  revalidatePath("/dashboard");
+}
+```
+
+2. Create the Vercel Cron route that auto-closes votes when their deadline passes:
+
+```ts
+// src/app/api/cron/close-votes/route.ts
+import { NextResponse } from "next/server";
+import { createAdminClient } from "@/lib/supabase/admin";
+
+export const runtime = "nodejs";
+
+/**
+ * Cron job: auto-close votes whose deadline has passed.
+ * Runs every 5 minutes via Vercel Cron.
+ */
+export async function GET(request: Request) {
+  // Verify the request is from Vercel Cron
+  const authHeader = request.headers.get("authorization");
+  const cronSecret = process.env.CRON_SECRET;
+
+  if (!cronSecret) {
+    throw new Error("CRON_SECRET environment variable is required");
+  }
+
+  if (authHeader !== `Bearer ${cronSecret}`) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  const adminClient = createAdminClient();
+  const now = new Date().toISOString();
+
+  // Find open votes whose deadline has passed
+  const { data: expiredVotes, error: fetchError } = await adminClient
+    .from("votes")
+    .select("id, title")
+    .eq("status", "open")
+    .not("deadline", "is", null)
+    .lte("deadline", now);
+
+  if (fetchError) {
+    console.error(`Failed to fetch expired votes: ${fetchError.message}`);
+    return NextResponse.json(
+      { error: "Failed to fetch expired votes" },
+      { status: 500 }
+    );
+  }
+
+  if (!expiredVotes || expiredVotes.length === 0) {
+    return NextResponse.json({ closed: 0 });
+  }
+
+  // Close each expired vote
+  const closedIds: string[] = [];
+  for (const vote of expiredVotes) {
+    const { error: updateError } = await adminClient
+      .from("votes")
+      .update({
+        status: "closed",
+        closed_at: now,
+      })
+      .eq("id", vote.id);
+
+    if (updateError) {
+      console.error(
+        `Failed to close vote "${vote.title}": ${updateError.message}`
+      );
+    } else {
+      closedIds.push(vote.id);
+    }
+  }
+
+  return NextResponse.json({
+    closed: closedIds.length,
+    vote_ids: closedIds,
+  });
+}
+```
+
+3. Create the Vercel Cron configuration:
+
+```json
+// vercel.json
+{
+  "crons": [
+    {
+      "path": "/api/cron/close-votes",
+      "schedule": "*/5 * * * *"
+    },
+    {
+      "path": "/api/cron/send-reminders",
+      "schedule": "0 * * * *"
+    }
+  ]
+}
+```
+
+4. Add `CRON_SECRET` to `.env.example`:
+
+Add the following line to the existing `.env.example` file:
+
+```env
+# Cron
+CRON_SECRET=your-cron-secret
+```
+
+5. Commit:
+
+```bash
+git add src/lib/actions/vote-admin-actions.ts src/app/api/cron/close-votes/ vercel.json .env.example
+git commit -m "Add vote open/close actions and Vercel Cron auto-close route"
+```
+
+---
+
+### Task 8.2 — Result Calculation Functions (Yes/No and Multiple Choice)
+
+**Files:**
+- `/Users/briantse/Projects/group-vote/src/lib/tallying.ts` (create)
+
+**Steps:**
+
+1. Create the tallying module with result calculation functions. This handles yes/no (simple count), multiple choice (count per option), and will be extended with ranked choice in Task 8.3:
+
+```ts
+// src/lib/tallying.ts
+import { createAdminClient } from "@/lib/supabase/admin";
+import type { Vote, VoteOption, PassingThreshold } from "@/lib/types";
+
+// ============================================================
+// RESULT TYPES
+// ============================================================
+
+export interface YesNoResult {
+  format: "yes_no";
+  totalBallots: number;
+  counts: { optionId: string; label: string; count: number }[];
+  winner: { optionId: string; label: string; count: number } | null;
+  passed: boolean;
+  meetsQuorum: boolean;
+  meetsThreshold: boolean;
+  quorumRequired: number;
+  quorumActual: number;
+  thresholdRequired: number;
+  thresholdActual: number;
+}
+
+export interface MultipleChoiceResult {
+  format: "multiple_choice";
+  totalBallots: number;
+  counts: { optionId: string; label: string; count: number }[];
+  winner: { optionId: string; label: string; count: number } | null;
+  passed: boolean;
+  meetsQuorum: boolean;
+  meetsThreshold: boolean;
+  quorumRequired: number;
+  quorumActual: number;
+  thresholdRequired: number;
+  thresholdActual: number;
+}
+
+export interface RankedChoiceRound {
+  roundNumber: number;
+  counts: { optionId: string; label: string; count: number }[];
+  eliminated: { optionId: string; label: string } | null;
+  winner: { optionId: string; label: string; count: number } | null;
+}
+
+export interface RankedChoiceResult {
+  format: "ranked_choice";
+  totalBallots: number;
+  rounds: RankedChoiceRound[];
+  winner: { optionId: string; label: string; count: number } | null;
+  passed: boolean;
+  meetsQuorum: boolean;
+  meetsThreshold: boolean;
+  quorumRequired: number;
+  quorumActual: number;
+  thresholdRequired: number;
+  thresholdActual: number;
+}
+
+export type VoteResult = YesNoResult | MultipleChoiceResult | RankedChoiceResult;
+
+// ============================================================
+// THRESHOLD HELPERS
+// ============================================================
+
+/**
+ * Convert a passing threshold enum to a decimal fraction.
+ */
+function getThresholdFraction(
+  threshold: PassingThreshold,
+  customPercentage: number | null
+): number {
+  switch (threshold) {
+    case "simple_majority":
+      return 0.5;
+    case "two_thirds":
+      return 2 / 3;
+    case "three_quarters":
+      return 0.75;
+    case "custom":
+      if (customPercentage === null) {
+        throw new Error("Custom threshold requires a percentage.");
+      }
+      return customPercentage / 100;
+    default:
+      return 0.5;
+  }
+}
+
+// ============================================================
+// FETCH BALLOTS
+// ============================================================
+
+async function fetchBallots(
+  voteId: string,
+  privacyLevel: string
+): Promise<{ choice: any }[]> {
+  const adminClient = createAdminClient();
+
+  if (privacyLevel === "anonymous") {
+    const { data, error } = await adminClient
+      .from("ballot_records_anonymous")
+      .select("choice")
+      .eq("vote_id", voteId);
+
+    if (error) throw new Error(`Failed to fetch ballots: ${error.message}`);
+    return data || [];
+  } else {
+    const { data, error } = await adminClient
+      .from("ballot_records_named")
+      .select("choice")
+      .eq("vote_id", voteId);
+
+    if (error) throw new Error(`Failed to fetch ballots: ${error.message}`);
+    return data || [];
+  }
+}
+
+// ============================================================
+// YES/NO TALLYING
+// ============================================================
+
+export async function tallyYesNo(
+  vote: Vote,
+  options: VoteOption[],
+  activeMemberCount: number
+): Promise<YesNoResult> {
+  const ballots = await fetchBallots(vote.id, vote.privacy_level);
+  const totalBallots = ballots.length;
+
+  // Count per option
+  const countMap = new Map<string, number>();
+  for (const option of options) {
+    countMap.set(option.id, 0);
+  }
+
+  for (const ballot of ballots) {
+    const choice = ballot.choice as { option_id: string };
+    const current = countMap.get(choice.option_id) || 0;
+    countMap.set(choice.option_id, current + 1);
+  }
+
+  const counts = options.map((opt) => ({
+    optionId: opt.id,
+    label: opt.label,
+    count: countMap.get(opt.id) || 0,
+  }));
+
+  // Determine winner (highest count)
+  const sorted = [...counts].sort((a, b) => b.count - a.count);
+  const winner = sorted[0]?.count > 0 ? sorted[0] : null;
+
+  // Quorum check
+  const quorumRequired = vote.quorum_percentage / 100;
+  const quorumActual =
+    activeMemberCount > 0 ? totalBallots / activeMemberCount : 0;
+  const meetsQuorum = quorumActual >= quorumRequired;
+
+  // Threshold check — for yes/no, threshold applies to the "Yes" option
+  const thresholdFraction = getThresholdFraction(
+    vote.passing_threshold,
+    vote.custom_threshold_percentage
+  );
+  const yesOption = counts.find((c) => c.label === "Yes");
+  const thresholdActual =
+    totalBallots > 0 ? (yesOption?.count || 0) / totalBallots : 0;
+  const meetsThreshold = thresholdActual > thresholdFraction;
+
+  return {
+    format: "yes_no",
+    totalBallots,
+    counts,
+    winner,
+    passed: meetsQuorum && meetsThreshold,
+    meetsQuorum,
+    meetsThreshold,
+    quorumRequired: vote.quorum_percentage,
+    quorumActual: Math.round(quorumActual * 100),
+    thresholdRequired: Math.round(thresholdFraction * 100),
+    thresholdActual: Math.round(thresholdActual * 100),
+  };
+}
+
+// ============================================================
+// MULTIPLE CHOICE TALLYING
+// ============================================================
+
+export async function tallyMultipleChoice(
+  vote: Vote,
+  options: VoteOption[],
+  activeMemberCount: number
+): Promise<MultipleChoiceResult> {
+  const ballots = await fetchBallots(vote.id, vote.privacy_level);
+  const totalBallots = ballots.length;
+
+  // Count per option
+  const countMap = new Map<string, number>();
+  for (const option of options) {
+    countMap.set(option.id, 0);
+  }
+
+  for (const ballot of ballots) {
+    const choice = ballot.choice as { option_id: string };
+    const current = countMap.get(choice.option_id) || 0;
+    countMap.set(choice.option_id, current + 1);
+  }
+
+  const counts = options.map((opt) => ({
+    optionId: opt.id,
+    label: opt.label,
+    count: countMap.get(opt.id) || 0,
+  }));
+
+  // Winner is highest count
+  const sorted = [...counts].sort((a, b) => b.count - a.count);
+  const winner = sorted[0]?.count > 0 ? sorted[0] : null;
+
+  // Quorum check
+  const quorumRequired = vote.quorum_percentage / 100;
+  const quorumActual =
+    activeMemberCount > 0 ? totalBallots / activeMemberCount : 0;
+  const meetsQuorum = quorumActual >= quorumRequired;
+
+  // Threshold check — winner's percentage of total ballots
+  const thresholdFraction = getThresholdFraction(
+    vote.passing_threshold,
+    vote.custom_threshold_percentage
+  );
+  const thresholdActual =
+    totalBallots > 0 && winner ? winner.count / totalBallots : 0;
+  const meetsThreshold = thresholdActual > thresholdFraction;
+
+  return {
+    format: "multiple_choice",
+    totalBallots,
+    counts,
+    winner,
+    passed: meetsQuorum && meetsThreshold,
+    meetsQuorum,
+    meetsThreshold,
+    quorumRequired: vote.quorum_percentage,
+    quorumActual: Math.round(quorumActual * 100),
+    thresholdRequired: Math.round(thresholdFraction * 100),
+    thresholdActual: Math.round(thresholdActual * 100),
+  };
+}
+```
+
+2. Commit (combined with Tasks 8.3–8.5).
+
+---
+
+### Task 8.3 — Ranked Choice Instant-Runoff Tallying Algorithm
+
+**Files:**
+- `/Users/briantse/Projects/group-vote/src/lib/tallying.ts` (append to existing)
+
+**Steps:**
+
+1. Add the ranked choice instant-runoff tallying function to `src/lib/tallying.ts`. This is the complete implementation with elimination rounds, vote redistribution, and round-by-round results:
+
+```ts
+// Append to src/lib/tallying.ts
+
+// ============================================================
+// RANKED CHOICE — INSTANT-RUNOFF TALLYING
+// ============================================================
+//
+// Algorithm:
+// 1. Count first-choice votes for each remaining candidate.
+// 2. If any candidate has more than 50% of active ballots, they win.
+// 3. Otherwise, eliminate the candidate with the fewest first-choice votes.
+//    (Ties in elimination are broken by who had fewer votes in the previous
+//     round; if still tied, the candidate with the higher display_order
+//     is eliminated — arbitrary but deterministic.)
+// 4. Redistribute eliminated candidate's ballots to each ballot's
+//    next-highest-ranked candidate that is still active.
+// 5. Repeat from step 1 until a winner is found or only one candidate remains.
+// ============================================================
+
+export async function tallyRankedChoice(
+  vote: Vote,
+  options: VoteOption[],
+  activeMemberCount: number
+): Promise<RankedChoiceResult> {
+  const rawBallots = await fetchBallots(vote.id, vote.privacy_level);
+  const totalBallots = rawBallots.length;
+
+  // Parse each ballot's ranking into an ordered array of option IDs
+  const ballots: string[][] = rawBallots.map((b) => {
+    const choice = b.choice as { ranked: string[] };
+    return choice.ranked;
+  });
+
+  // Build option lookup
+  const optionMap = new Map<string, VoteOption>();
+  for (const opt of options) {
+    optionMap.set(opt.id, opt);
+  }
+
+  // Track which candidates are still active (not eliminated)
+  const activeCandidates = new Set<string>(options.map((o) => o.id));
+
+  // Store round-by-round results
+  const rounds: RankedChoiceRound[] = [];
+
+  // Track previous round counts for tiebreaking
+  let previousRoundCounts = new Map<string, number>();
+
+  let winner: { optionId: string; label: string; count: number } | null = null;
+  let roundNumber = 0;
+
+  while (activeCandidates.size > 1) {
+    roundNumber++;
+
+    // Count first-choice votes among active candidates
+    const roundCounts = new Map<string, number>();
+    for (const candidateId of activeCandidates) {
+      roundCounts.set(candidateId, 0);
+    }
+
+    for (const ranking of ballots) {
+      // Find the highest-ranked candidate that is still active
+      const topChoice = ranking.find((id) => activeCandidates.has(id));
+      if (topChoice) {
+        roundCounts.set(topChoice, (roundCounts.get(topChoice) || 0) + 1);
+      }
+    }
+
+    // Build counts array for this round
+    const counts = Array.from(activeCandidates).map((id) => ({
+      optionId: id,
+      label: optionMap.get(id)?.label || "Unknown",
+      count: roundCounts.get(id) || 0,
+    }));
+
+    // Count active ballots this round (ballots that have at least one active candidate)
+    const activeBallotCount = counts.reduce((sum, c) => sum + c.count, 0);
+
+    // Check for a majority winner (>50% of active ballots)
+    const majorityThreshold = activeBallotCount / 2;
+    const sortedCounts = [...counts].sort((a, b) => b.count - a.count);
+    const topCandidate = sortedCounts[0];
+
+    if (topCandidate && topCandidate.count > majorityThreshold) {
+      // We have a winner
+      winner = topCandidate;
+      rounds.push({
+        roundNumber,
+        counts,
+        eliminated: null,
+        winner: topCandidate,
+      });
+      break;
+    }
+
+    // No majority — eliminate the candidate with the fewest votes
+    // Sort ascending by count, then break ties:
+    //   1. By previous round count (fewer = eliminated)
+    //   2. By display_order (higher = eliminated)
+    const sortedForElimination = [...counts].sort((a, b) => {
+      if (a.count !== b.count) return a.count - b.count;
+      // Tiebreaker 1: previous round count
+      const aPrev = previousRoundCounts.get(a.optionId) || 0;
+      const bPrev = previousRoundCounts.get(b.optionId) || 0;
+      if (aPrev !== bPrev) return aPrev - bPrev;
+      // Tiebreaker 2: display_order (higher = eliminated first)
+      const aOrder = optionMap.get(a.optionId)?.display_order || 0;
+      const bOrder = optionMap.get(b.optionId)?.display_order || 0;
+      return bOrder - aOrder;
+    });
+
+    const eliminated = sortedForElimination[0];
+    activeCandidates.delete(eliminated.optionId);
+
+    rounds.push({
+      roundNumber,
+      counts,
+      eliminated: {
+        optionId: eliminated.optionId,
+        label: eliminated.label,
+      },
+      winner: null,
+    });
+
+    previousRoundCounts = roundCounts;
+  }
+
+  // If we exit the loop with exactly one candidate remaining and no winner declared
+  if (!winner && activeCandidates.size === 1) {
+    const lastCandidateId = Array.from(activeCandidates)[0];
+    const lastOption = optionMap.get(lastCandidateId);
+
+    // Count final ballots for the last candidate
+    let finalCount = 0;
+    for (const ranking of ballots) {
+      if (ranking.find((id) => activeCandidates.has(id))) {
+        finalCount++;
+      }
+    }
+
+    winner = {
+      optionId: lastCandidateId,
+      label: lastOption?.label || "Unknown",
+      count: finalCount,
+    };
+
+    rounds.push({
+      roundNumber: roundNumber + 1,
+      counts: [
+        {
+          optionId: lastCandidateId,
+          label: lastOption?.label || "Unknown",
+          count: finalCount,
+        },
+      ],
+      eliminated: null,
+      winner,
+    });
+  }
+
+  // Quorum check
+  const quorumRequired = vote.quorum_percentage / 100;
+  const quorumActual =
+    activeMemberCount > 0 ? totalBallots / activeMemberCount : 0;
+  const meetsQuorum = quorumActual >= quorumRequired;
+
+  // Threshold check — for ranked choice, the winner's final-round percentage
+  const thresholdFraction = getThresholdFraction(
+    vote.passing_threshold,
+    vote.custom_threshold_percentage
+  );
+  const thresholdActual =
+    totalBallots > 0 && winner ? winner.count / totalBallots : 0;
+  const meetsThreshold = thresholdActual > thresholdFraction;
+
+  return {
+    format: "ranked_choice",
+    totalBallots,
+    rounds,
+    winner,
+    passed: meetsQuorum && meetsThreshold,
+    meetsQuorum,
+    meetsThreshold,
+    quorumRequired: vote.quorum_percentage,
+    quorumActual: Math.round(quorumActual * 100),
+    thresholdRequired: Math.round(thresholdFraction * 100),
+    thresholdActual: Math.round(thresholdActual * 100),
+  };
+}
+
+// ============================================================
+// UNIFIED TALLY FUNCTION
+// ============================================================
+
+/**
+ * Tally a vote based on its format. Returns the appropriate result type.
+ */
+export async function tallyVote(
+  vote: Vote,
+  options: VoteOption[],
+  activeMemberCount: number
+): Promise<VoteResult> {
+  switch (vote.format) {
+    case "yes_no":
+      return tallyYesNo(vote, options, activeMemberCount);
+    case "multiple_choice":
+      return tallyMultipleChoice(vote, options, activeMemberCount);
+    case "ranked_choice":
+      return tallyRankedChoice(vote, options, activeMemberCount);
+    default:
+      throw new Error(`Unsupported vote format: ${vote.format}`);
+  }
+}
+```
+
+2. Commit (combined with Tasks 8.4 and 8.5).
+
+---
+
+### Task 8.4 — Quorum and Threshold Enforcement
+
+The quorum and threshold logic is already integrated into each tallying function above (Tasks 8.2 and 8.3). Each result includes `meetsQuorum`, `meetsThreshold`, and `passed` fields. This task adds the status badge helper used by the results display.
+
+**Files:**
+- `/Users/briantse/Projects/group-vote/src/lib/result-helpers.ts` (create)
+
+**Steps:**
+
+1. Create a helper module for result display logic:
+
+```ts
+// src/lib/result-helpers.ts
+import type { VoteResult } from "@/lib/tallying";
+
+export type ResultStatus = "Passed" | "Failed" | "Inconclusive";
+
+/**
+ * Determine the display status of a vote result.
+ * - "Passed" = quorum met AND threshold met
+ * - "Failed" = quorum met but threshold NOT met
+ * - "Inconclusive" = quorum NOT met (regardless of threshold)
+ */
+export function getResultStatus(result: VoteResult): ResultStatus {
+  if (!result.meetsQuorum) return "Inconclusive";
+  if (result.passed) return "Passed";
+  return "Failed";
+}
+
+export const RESULT_STATUS_STYLES: Record<ResultStatus, string> = {
+  Passed: "bg-green-100 text-green-800",
+  Failed: "bg-red-100 text-red-800",
+  Inconclusive: "bg-yellow-100 text-yellow-800",
+};
+
+/**
+ * Get a human-readable explanation of the result status.
+ */
+export function getResultExplanation(result: VoteResult): string {
+  if (!result.meetsQuorum) {
+    return `Inconclusive — quorum not met. ${result.quorumActual}% participated, but ${result.quorumRequired}% was required.`;
+  }
+  if (!result.meetsThreshold) {
+    return `Failed — the winning option received ${result.thresholdActual}% of votes, but ${result.thresholdRequired}% was required to pass.`;
+  }
+  return `Passed — quorum met (${result.quorumActual}%) and threshold met (${result.thresholdActual}% vs ${result.thresholdRequired}% required).`;
+}
+```
+
+2. Commit (combined with Task 8.5).
+
+---
+
+### Task 8.5 — Results Display Page
+
+**Files:**
+- `/Users/briantse/Projects/group-vote/src/app/(protected)/votes/[id]/results/page.tsx` (create)
+
+**Steps:**
+
+1. Create the results directory:
+
+```bash
+mkdir -p "/Users/briantse/Projects/group-vote/src/app/(protected)/votes/[id]/results"
+```
+
+2. Create the results display page with CSS bar charts and round-by-round display for ranked choice:
+
+```tsx
+// src/app/(protected)/votes/[id]/results/page.tsx
+import { getCurrentMember } from "@/lib/auth";
+import { createAdminClient } from "@/lib/supabase/admin";
+import { notFound } from "next/navigation";
+import { tallyVote, type VoteResult, type RankedChoiceResult } from "@/lib/tallying";
+import {
+  getResultStatus,
+  getResultExplanation,
+  RESULT_STATUS_STYLES,
+} from "@/lib/result-helpers";
+import {
+  VOTE_FORMAT_LABELS,
+  PRIVACY_LEVEL_LABELS,
+} from "@/lib/constants";
+import type { Vote, VoteOption } from "@/lib/types";
+
+export default async function ResultsPage({
+  params,
+}: {
+  params: Promise<{ id: string }>;
+}) {
+  const { id } = await params;
+  await getCurrentMember();
+  const adminClient = createAdminClient();
+
+  // Fetch vote
+  const { data: vote, error } = await adminClient
+    .from("votes")
+    .select("*")
+    .eq("id", id)
+    .single();
+
+  if (error || !vote) {
+    notFound();
+  }
+
+  const typedVote = vote as Vote;
+
+  if (typedVote.status !== "closed") {
+    return (
+      <div className="mx-auto max-w-2xl py-12 text-center">
+        <h1 className="text-xl font-bold text-gray-900">
+          Results Not Available
+        </h1>
+        <p className="mt-2 text-gray-500">
+          This vote is still open. Results will be available once it closes.
+        </p>
+        <a
+          href={`/votes/${id}`}
+          className="mt-4 inline-block text-blue-600 hover:text-blue-800"
+        >
+          Back to vote
+        </a>
+      </div>
+    );
+  }
+
+  // Fetch options
+  const { data: options } = await adminClient
+    .from("vote_options")
+    .select("*")
+    .eq("vote_id", id)
+    .order("display_order", { ascending: true });
+
+  const typedOptions = (options || []) as VoteOption[];
+
+  // Get active member count at close time
+  const { count: activeMemberCount } = await adminClient
+    .from("members")
+    .select("*", { count: "exact", head: true })
+    .eq("active", true);
+
+  // Tally the vote
+  const result = await tallyVote(
+    typedVote,
+    typedOptions,
+    activeMemberCount || 0
+  );
+
+  const status = getResultStatus(result);
+  const explanation = getResultExplanation(result);
+
+  return (
+    <div className="mx-auto max-w-2xl space-y-6">
+      <div>
+        <a
+          href={`/votes/${id}`}
+          className="text-sm text-blue-600 hover:text-blue-800"
+        >
+          &larr; Back to vote
+        </a>
+        <h1 className="mt-2 text-2xl font-bold text-gray-900">
+          {typedVote.title} — Results
+        </h1>
+        <div className="mt-2 flex flex-wrap gap-2 text-sm">
+          <span className="rounded-full bg-gray-100 px-3 py-1 text-gray-600">
+            {VOTE_FORMAT_LABELS[typedVote.format]}
+          </span>
+          <span className="rounded-full bg-gray-100 px-3 py-1 text-gray-600">
+            {PRIVACY_LEVEL_LABELS[typedVote.privacy_level]}
+          </span>
+        </div>
+      </div>
+
+      {/* Status badge and explanation */}
+      <div className="rounded-lg border bg-white p-5">
+        <div className="flex items-center gap-3">
+          <span
+            className={`inline-flex rounded-full px-3 py-1 text-sm font-semibold ${
+              RESULT_STATUS_STYLES[status]
+            }`}
+          >
+            {status}
+          </span>
+          {result.winner && (
+            <span className="text-lg font-bold text-gray-900">
+              Winner: {result.winner.label}
+            </span>
+          )}
+        </div>
+        <p className="mt-2 text-sm text-gray-600">{explanation}</p>
+      </div>
+
+      {/* Quorum and threshold badges */}
+      <div className="flex gap-4">
+        <div
+          className={`flex-1 rounded-lg border p-4 ${
+            result.meetsQuorum ? "bg-green-50" : "bg-yellow-50"
+          }`}
+        >
+          <div className="text-sm font-medium text-gray-700">Quorum</div>
+          <div className="mt-1 text-2xl font-bold">
+            {result.quorumActual}%
+          </div>
+          <div className="text-xs text-gray-500">
+            {result.quorumRequired}% required
+          </div>
+        </div>
+        <div
+          className={`flex-1 rounded-lg border p-4 ${
+            result.meetsThreshold ? "bg-green-50" : "bg-red-50"
+          }`}
+        >
+          <div className="text-sm font-medium text-gray-700">Threshold</div>
+          <div className="mt-1 text-2xl font-bold">
+            {result.thresholdActual}%
+          </div>
+          <div className="text-xs text-gray-500">
+            {result.thresholdRequired}% required
+          </div>
+        </div>
+      </div>
+
+      {/* Vote breakdown — bar chart */}
+      {(result.format === "yes_no" || result.format === "multiple_choice") && (
+        <div className="rounded-lg border bg-white p-5">
+          <h2 className="text-lg font-semibold text-gray-900">
+            Vote Breakdown
+          </h2>
+          <p className="mt-1 text-sm text-gray-500">
+            {result.totalBallots} ballot{result.totalBallots !== 1 ? "s" : ""}{" "}
+            cast
+          </p>
+          <div className="mt-4 space-y-3">
+            {result.counts.map((item) => {
+              const percentage =
+                result.totalBallots > 0
+                  ? Math.round((item.count / result.totalBallots) * 100)
+                  : 0;
+              const isWinner =
+                result.winner?.optionId === item.optionId;
+
+              return (
+                <div key={item.optionId}>
+                  <div className="flex items-center justify-between text-sm">
+                    <span
+                      className={`font-medium ${
+                        isWinner ? "text-blue-700" : "text-gray-700"
+                      }`}
+                    >
+                      {item.label}
+                      {isWinner && " *"}
+                    </span>
+                    <span className="text-gray-500">
+                      {item.count} ({percentage}%)
+                    </span>
+                  </div>
+                  <div className="mt-1 h-4 w-full overflow-hidden rounded-full bg-gray-200">
+                    <div
+                      className={`h-full rounded-full transition-all ${
+                        isWinner ? "bg-blue-600" : "bg-gray-400"
+                      }`}
+                      style={{ width: `${percentage}%` }}
+                    />
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* Ranked choice — round-by-round display */}
+      {result.format === "ranked_choice" && (
+        <div className="space-y-4">
+          <h2 className="text-lg font-semibold text-gray-900">
+            Round-by-Round Results
+          </h2>
+          <p className="text-sm text-gray-500">
+            {result.totalBallots} ballot{result.totalBallots !== 1 ? "s" : ""}{" "}
+            cast. Candidates are eliminated one by one until a winner is found.
+          </p>
+
+          {(result as RankedChoiceResult).rounds.map((round) => (
+            <div
+              key={round.roundNumber}
+              className="rounded-lg border bg-white p-5"
+            >
+              <div className="flex items-center justify-between">
+                <h3 className="font-semibold text-gray-900">
+                  Round {round.roundNumber}
+                </h3>
+                {round.eliminated && (
+                  <span className="rounded-full bg-red-100 px-2 py-0.5 text-xs font-medium text-red-800">
+                    Eliminated: {round.eliminated.label}
+                  </span>
+                )}
+                {round.winner && (
+                  <span className="rounded-full bg-green-100 px-2 py-0.5 text-xs font-medium text-green-800">
+                    Winner: {round.winner.label}
+                  </span>
+                )}
+              </div>
+              <div className="mt-3 space-y-2">
+                {round.counts.map((item) => {
+                  const roundTotal = round.counts.reduce(
+                    (sum, c) => sum + c.count,
+                    0
+                  );
+                  const percentage =
+                    roundTotal > 0
+                      ? Math.round((item.count / roundTotal) * 100)
+                      : 0;
+                  const isWinner =
+                    round.winner?.optionId === item.optionId;
+                  const isEliminated =
+                    round.eliminated?.optionId === item.optionId;
+
+                  return (
+                    <div key={item.optionId}>
+                      <div className="flex items-center justify-between text-sm">
+                        <span
+                          className={`font-medium ${
+                            isEliminated
+                              ? "text-red-500 line-through"
+                              : isWinner
+                                ? "text-green-700"
+                                : "text-gray-700"
+                          }`}
+                        >
+                          {item.label}
+                        </span>
+                        <span className="text-gray-500">
+                          {item.count} ({percentage}%)
+                        </span>
+                      </div>
+                      <div className="mt-1 h-3 w-full overflow-hidden rounded-full bg-gray-200">
+                        <div
+                          className={`h-full rounded-full ${
+                            isEliminated
+                              ? "bg-red-300"
+                              : isWinner
+                                ? "bg-green-500"
+                                : "bg-blue-400"
+                          }`}
+                          style={{ width: `${percentage}%` }}
+                        />
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+```
+
+3. Verify the app compiles:
+
+```bash
+cd /Users/briantse/Projects/group-vote
+npm run build
+```
+
+4. Commit:
+
+```bash
+git add src/lib/tallying.ts src/lib/result-helpers.ts "src/app/(protected)/votes/[id]/results/"
+git commit -m "Implement vote tallying (yes/no, multiple choice, ranked choice IRV) and results page"
+```
+
+---## Phase 9: Dashboard & Participation
+
+### Task 9.1 — Member Dashboard
+
+**Files:**
+- `/Users/briantse/Projects/group-vote/src/app/(protected)/dashboard/page.tsx` (replace placeholder)
+
+**Steps:**
+
+1. Build the member dashboard with open votes banner, open vote list, and recent results:
+
+```tsx
+// src/app/(protected)/dashboard/page.tsx
+import { getCurrentMember } from "@/lib/auth";
+import { createAdminClient } from "@/lib/supabase/admin";
+import { VOTE_FORMAT_LABELS } from "@/lib/constants";
+import type { Vote } from "@/lib/types";
+
+export default async function DashboardPage() {
+  const member = await getCurrentMember();
+  const adminClient = createAdminClient();
+
+  // Fetch open votes
+  const { data: openVotes } = await adminClient
+    .from("votes")
+    .select("*")
+    .eq("status", "open")
+    .order("created_at", { ascending: false });
+
+  const typedOpenVotes = (openVotes || []) as Vote[];
+
+  // Fetch recently closed votes (last 10)
+  const { data: recentResults } = await adminClient
+    .from("votes")
+    .select("*")
+    .eq("status", "closed")
+    .order("closed_at", { ascending: false })
+    .limit(10);
+
+  const typedRecentResults = (recentResults || []) as Vote[];
+
+  // Check which open votes the member has already voted on
+  const openVoteIds = typedOpenVotes.map((v) => v.id);
+  const { data: myParticipation } = await adminClient
+    .from("participation_records")
+    .select("vote_id")
+    .eq("member_id", member.id)
+    .in("vote_id", openVoteIds.length > 0 ? openVoteIds : ["none"]);
+
+  const votedOnIds = new Set(
+    (myParticipation || []).map((p: { vote_id: string }) => p.vote_id)
+  );
+
+  const pendingVotes = typedOpenVotes.filter((v) => !votedOnIds.has(v.id));
+  const pendingCount = pendingVotes.length;
+
+  return (
+    <div className="space-y-6">
+      <div>
+        <h1 className="text-2xl font-bold text-gray-900">
+          Welcome, {member.name || member.email}
+        </h1>
+      </div>
+
+      {/* Open votes banner */}
+      {pendingCount > 0 && (
+        <div className="rounded-lg border-l-4 border-blue-500 bg-blue-50 p-4">
+          <p className="font-semibold text-blue-800">
+            You have {pendingCount} open vote{pendingCount !== 1 ? "s" : ""}{" "}
+            awaiting your ballot.
+          </p>
+        </div>
+      )}
+
+      {/* Open votes list */}
+      <div>
+        <h2 className="text-lg font-semibold text-gray-900">Open Votes</h2>
+        {typedOpenVotes.length === 0 ? (
+          <p className="mt-2 text-sm text-gray-500">
+            No votes currently open.
+          </p>
+        ) : (
+          <div className="mt-3 space-y-3">
+            {typedOpenVotes.map((vote) => {
+              const hasVoted = votedOnIds.has(vote.id);
+              return (
+                <a
+                  key={vote.id}
+                  href={`/votes/${vote.id}`}
+                  className="flex items-center justify-between rounded-lg border bg-white px-4 py-3 shadow-sm hover:border-blue-300 hover:shadow"
+                >
+                  <div>
+                    <span className="font-medium text-gray-900">
+                      {vote.title}
+                    </span>
+                    <div className="mt-1 flex gap-2 text-xs text-gray-500">
+                      <span>{VOTE_FORMAT_LABELS[vote.format]}</span>
+                      {vote.deadline && (
+                        <span>
+                          Deadline:{" "}
+                          {new Date(vote.deadline).toLocaleDateString()}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                  <span
+                    className={`rounded-full px-2 py-0.5 text-xs font-medium ${
+                      hasVoted
+                        ? "bg-green-100 text-green-800"
+                        : "bg-yellow-100 text-yellow-800"
+                    }`}
+                  >
+                    {hasVoted ? "Voted" : "Needs your vote"}
+                  </span>
+                </a>
+              );
+            })}
+          </div>
+        )}
+      </div>
+
+      {/* Recent results */}
+      <div>
+        <h2 className="text-lg font-semibold text-gray-900">
+          Recent Results
+        </h2>
+        {typedRecentResults.length === 0 ? (
+          <p className="mt-2 text-sm text-gray-500">
+            No votes have been completed yet.
+          </p>
+        ) : (
+          <div className="mt-3 space-y-3">
+            {typedRecentResults.map((vote) => (
+              <a
+                key={vote.id}
+                href={`/votes/${vote.id}/results`}
+                className="flex items-center justify-between rounded-lg border bg-white px-4 py-3 shadow-sm hover:border-blue-300 hover:shadow"
+              >
+                <div>
+                  <span className="font-medium text-gray-900">
+                    {vote.title}
+                  </span>
+                  <div className="mt-1 text-xs text-gray-500">
+                    Closed{" "}
+                    {vote.closed_at
+                      ? new Date(vote.closed_at).toLocaleDateString()
+                      : "recently"}
+                  </div>
+                </div>
+                <span className="rounded-full bg-blue-100 px-2 py-0.5 text-xs font-medium text-blue-800">
+                  View results
+                </span>
+              </a>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Quick actions */}
+      <div className="flex gap-3">
+        <a
+          href="/propose"
+          className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+        >
+          Propose a Vote
+        </a>
+        <a
+          href="/history"
+          className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+        >
+          My Voting History
+        </a>
+        {member.role === "admin" && (
+          <a
+            href="/admin/votes"
+            className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+          >
+            Manage Votes
+          </a>
+        )}
+      </div>
+    </div>
+  );
+}
+```
+
+2. Verify the app compiles:
+
+```bash
+cd /Users/briantse/Projects/group-vote
+npm run build
+```
+
+3. Commit:
+
+```bash
+git add "src/app/(protected)/dashboard/"
+git commit -m "Implement member dashboard with open votes banner and recent results"
+```
+
+---
+
+### Task 9.2 — Personal Voting History Page
+
+**Files:**
+- `/Users/briantse/Projects/group-vote/src/app/(protected)/history/page.tsx` (create)
+
+**Steps:**
+
+1. Create the history page directory:
+
+```bash
+mkdir -p /Users/briantse/Projects/group-vote/src/app/\(protected\)/history
+```
+
+2. Create the personal voting history page showing votes participated in, votes missed, and participation percentage:
+
+```tsx
+// src/app/(protected)/history/page.tsx
+import { getCurrentMember } from "@/lib/auth";
+import { createAdminClient } from "@/lib/supabase/admin";
+import { VOTE_FORMAT_LABELS } from "@/lib/constants";
+import type { Vote } from "@/lib/types";
+
+export default async function VotingHistoryPage() {
+  const member = await getCurrentMember();
+  const adminClient = createAdminClient();
+
+  // Fetch all closed votes
+  const { data: closedVotes } = await adminClient
+    .from("votes")
+    .select("*")
+    .eq("status", "closed")
+    .order("closed_at", { ascending: false });
+
+  const typedClosedVotes = (closedVotes || []) as Vote[];
+
+  // Fetch all participation records for this member
+  const { data: myParticipation } = await adminClient
+    .from("participation_records")
+    .select("vote_id, voted_at")
+    .eq("member_id", member.id);
+
+  const participatedMap = new Map<string, string>();
+  for (const record of myParticipation || []) {
+    participatedMap.set(record.vote_id, record.voted_at);
+  }
+
+  // Separate into voted and missed
+  const votedIn = typedClosedVotes.filter((v) => participatedMap.has(v.id));
+  const missed = typedClosedVotes.filter((v) => !participatedMap.has(v.id));
+
+  const totalClosed = typedClosedVotes.length;
+  const participationRate =
+    totalClosed > 0 ? Math.round((votedIn.length / totalClosed) * 100) : 0;
+
+  return (
+    <div className="space-y-6">
+      <div>
+        <h1 className="text-2xl font-bold text-gray-900">
+          My Voting History
+        </h1>
+      </div>
+
+      {/* Stats summary */}
+      <div className="grid grid-cols-3 gap-4">
+        <div className="rounded-lg border bg-white p-4 text-center">
+          <div className="text-2xl font-bold text-green-600">
+            {votedIn.length}
+          </div>
+          <div className="text-sm text-gray-500">Votes participated</div>
+        </div>
+        <div className="rounded-lg border bg-white p-4 text-center">
+          <div className="text-2xl font-bold text-red-500">
+            {missed.length}
+          </div>
+          <div className="text-sm text-gray-500">Votes missed</div>
+        </div>
+        <div className="rounded-lg border bg-white p-4 text-center">
+          <div className="text-2xl font-bold text-blue-600">
+            {participationRate}%
+          </div>
+          <div className="text-sm text-gray-500">Participation rate</div>
+        </div>
+      </div>
+
+      {/* Voted in */}
+      <div>
+        <h2 className="text-lg font-semibold text-gray-900">Participated</h2>
+        {votedIn.length === 0 ? (
+          <p className="mt-2 text-sm text-gray-500">
+            You haven&apos;t voted in any closed votes yet.
+          </p>
+        ) : (
+          <div className="mt-3 space-y-2">
+            {votedIn.map((vote) => (
+              <a
+                key={vote.id}
+                href={`/votes/${vote.id}/results`}
+                className="flex items-center justify-between rounded-lg border bg-white px-4 py-3 shadow-sm hover:border-blue-300"
+              >
+                <div>
+                  <span className="font-medium text-gray-900">
+                    {vote.title}
+                  </span>
+                  <div className="mt-0.5 text-xs text-gray-500">
+                    {VOTE_FORMAT_LABELS[vote.format]} — Voted{" "}
+                    {new Date(
+                      participatedMap.get(vote.id)!
+                    ).toLocaleDateString()}
+                  </div>
+                </div>
+                <span className="rounded-full bg-green-100 px-2 py-0.5 text-xs font-medium text-green-800">
+                  Voted
+                </span>
+              </a>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Missed */}
+      {missed.length > 0 && (
+        <div>
+          <h2 className="text-lg font-semibold text-gray-900">Missed</h2>
+          <div className="mt-3 space-y-2">
+            {missed.map((vote) => (
+              <a
+                key={vote.id}
+                href={`/votes/${vote.id}/results`}
+                className="flex items-center justify-between rounded-lg border bg-white px-4 py-3 shadow-sm hover:border-blue-300"
+              >
+                <div>
+                  <span className="font-medium text-gray-900">
+                    {vote.title}
+                  </span>
+                  <div className="mt-0.5 text-xs text-gray-500">
+                    {VOTE_FORMAT_LABELS[vote.format]} — Closed{" "}
+                    {vote.closed_at
+                      ? new Date(vote.closed_at).toLocaleDateString()
+                      : ""}
+                  </div>
+                </div>
+                <span className="rounded-full bg-red-100 px-2 py-0.5 text-xs font-medium text-red-800">
+                  Missed
+                </span>
+              </a>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+```
+
+3. Commit:
+
+```bash
+git add "src/app/(protected)/history/"
+git commit -m "Add personal voting history page with participation stats"
+```
+
+---
+
+### Task 9.3 — Admin Participation Dashboard
+
+**Files:**
+- `/Users/briantse/Projects/group-vote/src/app/(protected)/admin/participation/page.tsx` (replace placeholder)
+
+**Steps:**
+
+1. Build the admin participation dashboard with a per-member engagement table showing name, votes participated, votes missed, and participation rate with sortable columns:
+
+```tsx
+// src/app/(protected)/admin/participation/page.tsx
+import { requireAdmin } from "@/lib/auth";
+import { createAdminClient } from "@/lib/supabase/admin";
+import { ParticipationTable } from "./participation-table";
+import type { Member } from "@/lib/types";
+
+export default async function AdminParticipationPage() {
+  await requireAdmin();
+  const adminClient = createAdminClient();
+
+  // Fetch all active members
+  const { data: members } = await adminClient
+    .from("members")
+    .select("*")
+    .eq("active", true)
+    .order("name", { ascending: true });
+
+  const typedMembers = (members || []) as Member[];
+
+  // Fetch all closed votes (for calculating totals)
+  const { count: closedVoteCount } = await adminClient
+    .from("votes")
+    .select("*", { count: "exact", head: true })
+    .eq("status", "closed");
+
+  const totalClosedVotes = closedVoteCount || 0;
+
+  // Fetch all participation records for closed votes
+  const { data: allParticipation } = await adminClient
+    .from("participation_records")
+    .select("member_id, vote_id, votes!inner(status)")
+    .eq("votes.status", "closed");
+
+  // Count participation per member
+  const memberParticipationCount = new Map<string, number>();
+  for (const record of allParticipation || []) {
+    const current = memberParticipationCount.get(record.member_id) || 0;
+    memberParticipationCount.set(record.member_id, current + 1);
+  }
+
+  // Build the table data
+  const tableData = typedMembers.map((m) => {
+    const voted = memberParticipationCount.get(m.id) || 0;
+    const missed = totalClosedVotes - voted;
+    const rate =
+      totalClosedVotes > 0 ? Math.round((voted / totalClosedVotes) * 100) : 0;
+
+    return {
+      id: m.id,
+      name: m.name || m.email,
+      email: m.email,
+      voted,
+      missed,
+      rate,
+    };
+  });
+
+  return (
+    <div className="space-y-6">
+      <div>
+        <h1 className="text-2xl font-bold text-gray-900">
+          Participation Dashboard
+        </h1>
+        <p className="mt-1 text-sm text-gray-500">
+          {totalClosedVotes} closed vote{totalClosedVotes !== 1 ? "s" : ""} /{" "}
+          {typedMembers.length} active member
+          {typedMembers.length !== 1 ? "s" : ""}
+        </p>
+      </div>
+
+      <ParticipationTable data={tableData} />
+    </div>
+  );
+}
+```
+
+2. Create the sortable table client component:
+
+```tsx
+// src/app/(protected)/admin/participation/participation-table.tsx
+"use client";
+
+import { useState } from "react";
+
+interface MemberStats {
+  id: string;
+  name: string;
+  email: string;
+  voted: number;
+  missed: number;
+  rate: number;
+}
+
+type SortField = "name" | "voted" | "missed" | "rate";
+type SortDir = "asc" | "desc";
+
+export function ParticipationTable({ data }: { data: MemberStats[] }) {
+  const [sortField, setSortField] = useState<SortField>("name");
+  const [sortDir, setSortDir] = useState<SortDir>("asc");
+
+  function toggleSort(field: SortField) {
+    if (sortField === field) {
+      setSortDir(sortDir === "asc" ? "desc" : "asc");
+    } else {
+      setSortField(field);
+      setSortDir(field === "name" ? "asc" : "desc");
+    }
+  }
+
+  const sorted = [...data].sort((a, b) => {
+    let cmp: number;
+    if (sortField === "name") {
+      cmp = a.name.localeCompare(b.name);
+    } else {
+      cmp = a[sortField] - b[sortField];
+    }
+    return sortDir === "asc" ? cmp : -cmp;
+  });
+
+  function SortHeader({
+    field,
+    label,
+    className,
+  }: {
+    field: SortField;
+    label: string;
+    className?: string;
+  }) {
+    const isActive = sortField === field;
+    return (
+      <th
+        className={`cursor-pointer select-none px-4 py-3 text-xs font-medium uppercase tracking-wider text-gray-500 hover:text-gray-700 ${className || "text-left"}`}
+        onClick={() => toggleSort(field)}
+      >
+        {label}
+        {isActive && (
+          <span className="ml-1">{sortDir === "asc" ? "^" : "v"}</span>
+        )}
+      </th>
+    );
+  }
+
+  return (
+    <div className="overflow-hidden rounded-lg border bg-white shadow-sm">
+      <table className="min-w-full divide-y divide-gray-200">
+        <thead className="bg-gray-50">
+          <tr>
+            <SortHeader field="name" label="Member" />
+            <SortHeader
+              field="voted"
+              label="Voted"
+              className="text-center"
+            />
+            <SortHeader
+              field="missed"
+              label="Missed"
+              className="text-center"
+            />
+            <SortHeader
+              field="rate"
+              label="Rate"
+              className="text-right"
+            />
+          </tr>
+        </thead>
+        <tbody className="divide-y divide-gray-200">
+          {sorted.map((row) => (
+            <tr key={row.id}>
+              <td className="whitespace-nowrap px-4 py-3 text-sm">
+                <div className="font-medium text-gray-900">{row.name}</div>
+                <div className="text-xs text-gray-500">{row.email}</div>
+              </td>
+              <td className="whitespace-nowrap px-4 py-3 text-center text-sm text-green-600">
+                {row.voted}
+              </td>
+              <td className="whitespace-nowrap px-4 py-3 text-center text-sm text-red-500">
+                {row.missed}
+              </td>
+              <td className="whitespace-nowrap px-4 py-3 text-right text-sm">
+                <div className="flex items-center justify-end gap-2">
+                  <div className="h-2 w-16 overflow-hidden rounded-full bg-gray-200">
+                    <div
+                      className={`h-full rounded-full ${
+                        row.rate >= 75
+                          ? "bg-green-500"
+                          : row.rate >= 50
+                            ? "bg-yellow-500"
+                            : "bg-red-500"
+                      }`}
+                      style={{ width: `${row.rate}%` }}
+                    />
+                  </div>
+                  <span className="w-10 font-medium text-gray-700">
+                    {row.rate}%
+                  </span>
+                </div>
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+```
+
+3. Verify the app compiles:
+
+```bash
+cd /Users/briantse/Projects/group-vote
+npm run build
+```
+
+4. Commit:
+
+```bash
+git add "src/app/(protected)/admin/participation/"
+git commit -m "Add admin participation dashboard with sortable per-member engagement table"
+```
+
+---## Phase 10: Notifications & Reminders
+
+### Task 10.1 — Resend Email Setup
+
+**Files:**
+- `/Users/briantse/Projects/group-vote/src/lib/email.ts` (create)
+
+**Steps:**
+
+1. Create the email client module with a base send function and template wrapper:
+
+```ts
+// src/lib/email.ts
+import { Resend } from "resend";
+
+let resendClient: Resend | null = null;
+
+function getResendClient(): Resend {
+  if (resendClient) return resendClient;
+
+  const apiKey = process.env.RESEND_API_KEY;
+  if (!apiKey) {
+    throw new Error("RESEND_API_KEY environment variable is required");
+  }
+
+  resendClient = new Resend(apiKey);
+  return resendClient;
+}
+
+const FROM_ADDRESS = "Group Vote <votes@yourdomain.com>";
+
+/**
+ * Base email layout that wraps all transactional emails.
+ * Includes group branding and a footer with unsubscribe info.
+ */
+function wrapInTemplate(bodyHtml: string): string {
+  return `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; margin: 0; padding: 0; background-color: #f3f4f6; }
+    .container { max-width: 560px; margin: 0 auto; padding: 32px 16px; }
+    .card { background: #ffffff; border-radius: 12px; padding: 32px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
+    .header { text-align: center; margin-bottom: 24px; }
+    .header h1 { font-size: 20px; font-weight: 700; color: #111827; margin: 0; }
+    .header p { font-size: 13px; color: #6b7280; margin: 4px 0 0; }
+    .body { font-size: 15px; line-height: 1.6; color: #374151; }
+    .body h2 { font-size: 18px; font-weight: 600; color: #111827; margin: 0 0 8px; }
+    .body p { margin: 0 0 16px; }
+    .btn { display: inline-block; background: #2563eb; color: #ffffff !important; text-decoration: none; padding: 12px 24px; border-radius: 8px; font-weight: 600; font-size: 15px; }
+    .btn:hover { background: #1d4ed8; }
+    .footer { text-align: center; margin-top: 24px; font-size: 12px; color: #9ca3af; }
+    .footer a { color: #6b7280; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="card">
+      <div class="header">
+        <h1>Group Vote</h1>
+        <p>Anesthesia Group Voting System</p>
+      </div>
+      <div class="body">
+        ${bodyHtml}
+      </div>
+    </div>
+    <div class="footer">
+      <p>
+        This is an automated message from Group Vote.<br />
+        You're receiving this because you're a member of the anesthesia group.
+      </p>
+    </div>
+  </div>
+</body>
+</html>`.trim();
+}
+
+export interface SendEmailParams {
+  to: string;
+  subject: string;
+  bodyHtml: string;
+}
+
+/**
+ * Send a single email using Resend with the Group Vote template.
+ */
+export async function sendEmail(params: SendEmailParams): Promise<void> {
+  const resend = getResendClient();
+
+  const { error } = await resend.emails.send({
+    from: FROM_ADDRESS,
+    to: params.to,
+    subject: params.subject,
+    html: wrapInTemplate(params.bodyHtml),
+  });
+
+  if (error) {
+    throw new Error(`Failed to send email to ${params.to}: ${error.message}`);
+  }
+}
+
+/**
+ * Send the same email to multiple recipients (one email per recipient for privacy).
+ * Failures for individual recipients are logged but do not stop the batch.
+ */
+export async function sendBulkEmail(
+  recipients: string[],
+  subject: string,
+  bodyHtml: string
+): Promise<{ sent: number; failed: number }> {
+  let sent = 0;
+  let failed = 0;
+
+  for (const to of recipients) {
+    try {
+      await sendEmail({ to, subject, bodyHtml });
+      sent++;
+    } catch (err) {
+      console.error(
+        `Email send failed for ${to}:`,
+        err instanceof Error ? err.message : err
+      );
+      failed++;
+    }
+  }
+
+  return { sent, failed };
+}
+```
+
+2. Commit (combined with Tasks 10.2–10.3).
+
+---
+
+### Task 10.2 — Email Templates
+
+**Files:**
+- `/Users/briantse/Projects/group-vote/src/lib/email-templates.ts` (create)
+
+**Steps:**
+
+1. Create the email template functions. Each returns the subject and body HTML for a specific notification type:
+
+```ts
+// src/lib/email-templates.ts
+
+const APP_URL = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
+
+/**
+ * Magic link email — sent when a member requests to log in.
+ */
+export function magicLinkEmail(magicLinkUrl: string) {
+  return {
+    subject: "Your Group Vote login link",
+    bodyHtml: `
+      <h2>Sign in to Group Vote</h2>
+      <p>Click the button below to sign in. This link expires in 15 minutes.</p>
+      <p style="text-align: center; margin: 24px 0;">
+        <a href="${magicLinkUrl}" class="btn">Sign In</a>
+      </p>
+      <p style="font-size: 13px; color: #6b7280;">
+        If you didn't request this link, you can safely ignore this email.
+      </p>
+    `,
+  };
+}
+
+/**
+ * Vote opened email — sent to all members when a vote goes live.
+ * Includes a direct link to the ballot page.
+ */
+export function voteOpenedEmail(voteTitle: string, voteId: string, deadline: string | null) {
+  const ballotUrl = `${APP_URL}/votes/${voteId}`;
+  const deadlineText = deadline
+    ? `The deadline to vote is <strong>${new Date(deadline).toLocaleString()}</strong>.`
+    : "This vote has no deadline — the admin will close it manually.";
+
+  return {
+    subject: `New vote: ${voteTitle}`,
+    bodyHtml: `
+      <h2>${voteTitle}</h2>
+      <p>A new vote has been opened for the group. ${deadlineText}</p>
+      <p style="text-align: center; margin: 24px 0;">
+        <a href="${ballotUrl}" class="btn">Cast Your Vote</a>
+      </p>
+      <p style="font-size: 13px; color: #6b7280;">
+        You can change your vote at any time before it closes.
+      </p>
+    `,
+  };
+}
+
+/**
+ * Results published email — sent to all members when a vote closes.
+ */
+export function resultsPublishedEmail(
+  voteTitle: string,
+  voteId: string,
+  resultSummary: string
+) {
+  const resultsUrl = `${APP_URL}/votes/${voteId}/results`;
+
+  return {
+    subject: `Results: ${voteTitle}`,
+    bodyHtml: `
+      <h2>Results: ${voteTitle}</h2>
+      <p>${resultSummary}</p>
+      <p style="text-align: center; margin: 24px 0;">
+        <a href="${resultsUrl}" class="btn">View Full Results</a>
+      </p>
+    `,
+  };
+}
+
+/**
+ * Reminder email — sent to non-voters for an open vote.
+ */
+export function reminderEmail(
+  voteTitle: string,
+  voteId: string,
+  deadline: string | null,
+  urgency: "halfway" | "24h" | "2h" | "manual"
+) {
+  const ballotUrl = `${APP_URL}/votes/${voteId}`;
+
+  const urgencyText: Record<string, string> = {
+    halfway: "The voting period is halfway over.",
+    "24h": "There are about 24 hours left to vote.",
+    "2h": "Voting closes in about 2 hours!",
+    manual: "This is a reminder from the group admin.",
+  };
+
+  const deadlineText = deadline
+    ? `Deadline: <strong>${new Date(deadline).toLocaleString()}</strong>`
+    : "";
+
+  return {
+    subject: `Reminder: Vote on "${voteTitle}"`,
+    bodyHtml: `
+      <h2>Don't forget to vote</h2>
+      <p>You haven't voted on <strong>${voteTitle}</strong> yet. ${urgencyText[urgency]}</p>
+      ${deadlineText ? `<p>${deadlineText}</p>` : ""}
+      <p style="text-align: center; margin: 24px 0;">
+        <a href="${ballotUrl}" class="btn">Vote Now</a>
+      </p>
+      <p style="font-size: 13px; color: #6b7280;">
+        It only takes about 30 seconds.
+      </p>
+    `,
+  };
+}
+```
+
+2. Commit (combined with Task 10.3).
+
+---
+
+### Task 10.3 — Send Notifications on Vote Events
+
+**Files:**
+- `/Users/briantse/Projects/group-vote/src/lib/actions/vote-admin-actions.ts` (modify)
+- `/Users/briantse/Projects/group-vote/src/lib/notifications.ts` (create)
+
+**Steps:**
+
+1. Create a notifications helper module that handles sending emails for vote events:
+
+```ts
+// src/lib/notifications.ts
+import { createAdminClient } from "@/lib/supabase/admin";
+import { sendBulkEmail } from "@/lib/email";
+import { voteOpenedEmail, resultsPublishedEmail, reminderEmail } from "@/lib/email-templates";
+
+/**
+ * Send "vote opened" email to all active members.
+ */
+export async function notifyVoteOpened(
+  voteId: string,
+  voteTitle: string,
+  deadline: string | null
+): Promise<void> {
+  const adminClient = createAdminClient();
+
+  const { data: members } = await adminClient
+    .from("members")
+    .select("email")
+    .eq("active", true);
+
+  if (!members || members.length === 0) return;
+
+  const emails = members.map((m: { email: string }) => m.email);
+  const template = voteOpenedEmail(voteTitle, voteId, deadline);
+
+  await sendBulkEmail(emails, template.subject, template.bodyHtml);
+}
+
+/**
+ * Send "results published" email to all active members.
+ */
+export async function notifyResultsPublished(
+  voteId: string,
+  voteTitle: string,
+  resultSummary: string
+): Promise<void> {
+  const adminClient = createAdminClient();
+
+  const { data: members } = await adminClient
+    .from("members")
+    .select("email")
+    .eq("active", true);
+
+  if (!members || members.length === 0) return;
+
+  const emails = members.map((m: { email: string }) => m.email);
+  const template = resultsPublishedEmail(voteTitle, voteId, resultSummary);
+
+  await sendBulkEmail(emails, template.subject, template.bodyHtml);
+}
+
+/**
+ * Send a reminder email to non-voters for a specific vote.
+ */
+export async function sendReminderToNonVoters(
+  voteId: string,
+  voteTitle: string,
+  deadline: string | null,
+  urgency: "halfway" | "24h" | "2h" | "manual"
+): Promise<{ sent: number; failed: number }> {
+  const adminClient = createAdminClient();
+
+  // Get all active members
+  const { data: allMembers } = await adminClient
+    .from("members")
+    .select("id, email")
+    .eq("active", true);
+
+  if (!allMembers || allMembers.length === 0) {
+    return { sent: 0, failed: 0 };
+  }
+
+  // Get members who have already voted
+  const { data: participation } = await adminClient
+    .from("participation_records")
+    .select("member_id")
+    .eq("vote_id", voteId);
+
+  const votedMemberIds = new Set(
+    (participation || []).map((p: { member_id: string }) => p.member_id)
+  );
+
+  // Filter to non-voters only
+  const nonVoterEmails = allMembers
+    .filter((m: { id: string }) => !votedMemberIds.has(m.id))
+    .map((m: { email: string }) => m.email);
+
+  if (nonVoterEmails.length === 0) {
+    return { sent: 0, failed: 0 };
+  }
+
+  const template = reminderEmail(voteTitle, voteId, deadline, urgency);
+
+  return sendBulkEmail(nonVoterEmails, template.subject, template.bodyHtml);
+}
+```
+
+2. Update the `openVote` action in `src/lib/actions/vote-admin-actions.ts` to send notifications when a vote goes live. Add the following import and call after the status update succeeds:
+
+Add this import at the top of the file:
+
+```ts
+import { notifyVoteOpened } from "@/lib/notifications";
+```
+
+Then add the following lines at the end of the `openVote` function, right before the `revalidatePath` calls:
+
+```ts
+  // Send "vote opened" email to all members (non-blocking)
+  const { data: voteData } = await adminClient
+    .from("votes")
+    .select("title, deadline")
+    .eq("id", voteId)
+    .single();
+
+  if (voteData) {
+    notifyVoteOpened(voteId, voteData.title, voteData.deadline).catch(
+      (err) =>
+        console.error("Failed to send vote opened notifications:", err)
+    );
+  }
+```
+
+3. Update the `closeVote` action similarly. Add the import for `notifyResultsPublished`:
+
+```ts
+import { notifyResultsPublished } from "@/lib/notifications";
+```
+
+Then add these lines at the end of the `closeVote` function, right before the `revalidatePath` calls:
+
+```ts
+  // Send "results published" email (non-blocking)
+  const { data: closedVoteData } = await adminClient
+    .from("votes")
+    .select("title")
+    .eq("id", voteId)
+    .single();
+
+  if (closedVoteData) {
+    notifyResultsPublished(
+      voteId,
+      closedVoteData.title,
+      "The vote has closed. Click below to see the results."
+    ).catch((err) =>
+      console.error("Failed to send results notifications:", err)
+    );
+  }
+```
+
+4. Commit:
+
+```bash
+git add src/lib/email.ts src/lib/email-templates.ts src/lib/notifications.ts src/lib/actions/vote-admin-actions.ts
+git commit -m "Add Resend email client, templates, and vote event notifications"
+```
+
+---
+
+### Task 10.4 — Manual Reminder (Admin)
+
+**Files:**
+- `/Users/briantse/Projects/group-vote/src/lib/actions/vote-admin-actions.ts` (modify — add sendManualReminder action)
+
+**Steps:**
+
+1. Add a manual reminder server action to `src/lib/actions/vote-admin-actions.ts`. This allows admins to trigger a reminder email to non-voters from the vote detail page:
+
+Add this import if not already present:
+
+```ts
+import { sendReminderToNonVoters } from "@/lib/notifications";
+```
+
+Then add the following function:
+
+```ts
+/**
+ * Send a manual reminder email to all members who have not yet
+ * voted on a specific vote. Admin-only action.
+ */
+export async function sendManualReminder(
+  voteId: string
+): Promise<{ sent: number; failed: number }> {
+  await requireAdmin();
+  const adminClient = createAdminClient();
+
+  const { data: vote, error: fetchError } = await adminClient
+    .from("votes")
+    .select("id, title, deadline, status")
+    .eq("id", voteId)
+    .single();
+
+  if (fetchError || !vote) {
+    throw new Error("Vote not found.");
+  }
+
+  if (vote.status !== "open") {
+    throw new Error("Reminders can only be sent for open votes.");
+  }
+
+  const result = await sendReminderToNonVoters(
+    vote.id,
+    vote.title,
+    vote.deadline,
+    "manual"
+  );
+
+  return result;
+}
+```
+
+2. Add a reminder button to the vote detail page. Create a small client component that calls the action:
+
+Create the file `/Users/briantse/Projects/group-vote/src/components/admin-reminder-button.tsx`:
+
+```tsx
+// src/components/admin-reminder-button.tsx
+"use client";
+
+import { useTransition, useState } from "react";
+import { sendManualReminder } from "@/lib/actions/vote-admin-actions";
+
+export function AdminReminderButton({ voteId }: { voteId: string }) {
+  const [isPending, startTransition] = useTransition();
+  const [result, setResult] = useState<string | null>(null);
+
+  function handleSend() {
+    if (!confirm("Send a reminder email to all members who haven't voted yet?"))
+      return;
+
+    setResult(null);
+    startTransition(async () => {
+      try {
+        const { sent, failed } = await sendManualReminder(voteId);
+        setResult(
+          `Reminder sent to ${sent} member${sent !== 1 ? "s" : ""}${
+            failed > 0 ? ` (${failed} failed)` : ""
+          }.`
+        );
+      } catch (err) {
+        setResult(
+          err instanceof Error ? err.message : "Failed to send reminders."
+        );
+      }
+    });
+  }
+
+  return (
+    <div>
+      <button
+        onClick={handleSend}
+        disabled={isPending}
+        className="rounded-lg border border-yellow-300 bg-yellow-50 px-4 py-2 text-sm font-semibold text-yellow-800 hover:bg-yellow-100 disabled:opacity-50"
+      >
+        {isPending ? "Sending..." : "Send Reminder to Non-Voters"}
+      </button>
+      {result && (
+        <p className="mt-2 text-sm text-gray-600">{result}</p>
+      )}
+    </div>
+  );
+}
+```
+
+3. Add the reminder button to the vote detail page. In `src/app/(protected)/votes/[id]/page.tsx`, import and render the button for admin users when the vote is open. Add this import:
+
+```tsx
+import { AdminReminderButton } from "@/components/admin-reminder-button";
+```
+
+Then add this block after the `BallotWrapper` section, inside the `typedVote.status === "open"` conditional:
+
+```tsx
+      {typedVote.status === "open" && member.role === "admin" && (
+        <div className="rounded-lg border border-dashed border-gray-300 p-4">
+          <h3 className="text-sm font-semibold text-gray-700">
+            Admin Actions
+          </h3>
+          <div className="mt-3">
+            <AdminReminderButton voteId={id} />
+          </div>
+        </div>
+      )}
+```
+
+4. Commit:
+
+```bash
+git add src/lib/actions/vote-admin-actions.ts src/components/admin-reminder-button.tsx "src/app/(protected)/votes/[id]/page.tsx"
+git commit -m "Add manual reminder button for admins to nudge non-voters"
+```
+
+---
+
+### Task 10.5 — Automatic Reminders via Vercel Cron
+
+**Files:**
+- `/Users/briantse/Projects/group-vote/supabase/migrations/00002_sent_reminders.sql` (create)
+- `/Users/briantse/Projects/group-vote/src/app/api/cron/send-reminders/route.ts` (create)
+
+**Steps:**
+
+1. Create a migration to add the `sent_reminders` table that tracks which reminders have been sent to avoid duplicates:
+
+```sql
+-- supabase/migrations/00002_sent_reminders.sql
+-- Tracks which automatic reminders have been sent for each vote
+-- to prevent duplicate reminder emails.
+
+create table sent_reminders (
+  id         uuid primary key default gen_random_uuid(),
+  vote_id    uuid not null references votes(id) on delete cascade,
+  type       text not null check (type in ('halfway', '24h', '2h')),
+  sent_at    timestamptz not null default now(),
+
+  -- One reminder of each type per vote
+  constraint unique_reminder_per_vote unique (vote_id, type)
+);
+
+comment on table sent_reminders is 'Tracks which automatic reminders have been sent per vote';
+
+create index idx_sent_reminders_vote_id on sent_reminders (vote_id);
+
+-- RLS: only accessible via service role (cron job)
+alter table sent_reminders enable row level security;
+-- No policies — only the service role key can access this table
+```
+
+2. Apply the migration:
+
+```bash
+cd /Users/briantse/Projects/group-vote
+npx supabase db push
+```
+
+Or for local development:
+
+```bash
+npx supabase migration up
+```
+
+3. Create the cron route that checks for open time-bound votes needing reminders. It handles three reminder windows (halfway, 24h before deadline, 2h before deadline), sends only to non-voters, and tracks sent reminders to avoid duplicates:
+
+```ts
+// src/app/api/cron/send-reminders/route.ts
+import { NextResponse } from "next/server";
+import { createAdminClient } from "@/lib/supabase/admin";
+import { sendReminderToNonVoters } from "@/lib/notifications";
+
+export const runtime = "nodejs";
+
+type ReminderType = "halfway" | "24h" | "2h";
+
+interface ReminderCheck {
+  type: ReminderType;
+  shouldSend: (openedAt: Date, deadline: Date, now: Date) => boolean;
+}
+
+/**
+ * Define the reminder windows:
+ * - "halfway": when current time has passed the midpoint between opened_at and deadline
+ * - "24h": when there are 24 hours or fewer remaining
+ * - "2h": when there are 2 hours or fewer remaining
+ */
+const REMINDER_CHECKS: ReminderCheck[] = [
+  {
+    type: "halfway",
+    shouldSend: (openedAt, deadline, now) => {
+      const midpoint = new Date(
+        openedAt.getTime() +
+          (deadline.getTime() - openedAt.getTime()) / 2
+      );
+      return now >= midpoint;
+    },
+  },
+  {
+    type: "24h",
+    shouldSend: (_openedAt, deadline, now) => {
+      const hoursRemaining =
+        (deadline.getTime() - now.getTime()) / (1000 * 60 * 60);
+      return hoursRemaining <= 24 && hoursRemaining > 0;
+    },
+  },
+  {
+    type: "2h",
+    shouldSend: (_openedAt, deadline, now) => {
+      const hoursRemaining =
+        (deadline.getTime() - now.getTime()) / (1000 * 60 * 60);
+      return hoursRemaining <= 2 && hoursRemaining > 0;
+    },
+  },
+];
+
+/**
+ * Cron job: send automatic reminders for open votes with deadlines.
+ * Runs every hour via Vercel Cron.
+ *
+ * For each open vote with a deadline:
+ *   1. Check which reminder windows have been triggered
+ *   2. Check which reminders have already been sent (via sent_reminders table)
+ *   3. Send any unsent reminders to non-voters
+ *   4. Record that the reminder was sent
+ */
+export async function GET(request: Request) {
+  // Verify the request is from Vercel Cron
+  const authHeader = request.headers.get("authorization");
+  const cronSecret = process.env.CRON_SECRET;
+
+  if (!cronSecret) {
+    throw new Error("CRON_SECRET environment variable is required");
+  }
+
+  if (authHeader !== `Bearer ${cronSecret}`) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  const adminClient = createAdminClient();
+  const now = new Date();
+
+  // Fetch all open votes that have a deadline and an opened_at timestamp
+  const { data: openVotes, error: fetchError } = await adminClient
+    .from("votes")
+    .select("id, title, deadline, opened_at")
+    .eq("status", "open")
+    .not("deadline", "is", null)
+    .not("opened_at", "is", null);
+
+  if (fetchError) {
+    console.error(`Failed to fetch open votes: ${fetchError.message}`);
+    return NextResponse.json(
+      { error: "Failed to fetch open votes" },
+      { status: 500 }
+    );
+  }
+
+  if (!openVotes || openVotes.length === 0) {
+    return NextResponse.json({ reminders_sent: 0, details: [] });
+  }
+
+  // Fetch all already-sent reminders
+  const voteIds = openVotes.map((v: { id: string }) => v.id);
+  const { data: existingReminders } = await adminClient
+    .from("sent_reminders")
+    .select("vote_id, type")
+    .in("vote_id", voteIds);
+
+  const sentSet = new Set(
+    (existingReminders || []).map(
+      (r: { vote_id: string; type: string }) => `${r.vote_id}:${r.type}`
+    )
+  );
+
+  const details: {
+    voteId: string;
+    voteTitle: string;
+    reminderType: string;
+    sent: number;
+  }[] = [];
+
+  for (const vote of openVotes) {
+    const deadline = new Date(vote.deadline);
+    const openedAt = new Date(vote.opened_at);
+
+    // Skip if deadline has already passed (close-votes cron handles that)
+    if (deadline <= now) continue;
+
+    for (const check of REMINDER_CHECKS) {
+      const key = `${vote.id}:${check.type}`;
+
+      // Skip if already sent
+      if (sentSet.has(key)) continue;
+
+      // Check if this reminder window is active
+      if (!check.shouldSend(openedAt, deadline, now)) continue;
+
+      // Send the reminder to non-voters
+      try {
+        const result = await sendReminderToNonVoters(
+          vote.id,
+          vote.title,
+          vote.deadline,
+          check.type
+        );
+
+        // Record that this reminder was sent
+        await adminClient.from("sent_reminders").insert({
+          vote_id: vote.id,
+          type: check.type,
+        });
+
+        details.push({
+          voteId: vote.id,
+          voteTitle: vote.title,
+          reminderType: check.type,
+          sent: result.sent,
+        });
+      } catch (err) {
+        console.error(
+          `Failed to send ${check.type} reminder for vote "${vote.title}":`,
+          err instanceof Error ? err.message : err
+        );
+      }
+    }
+  }
+
+  const totalSent = details.reduce((sum, d) => sum + d.sent, 0);
+
+  return NextResponse.json({
+    reminders_sent: totalSent,
+    details,
+  });
+}
+```
+
+4. The `vercel.json` cron configuration was already created in Task 8.1 with the `/api/cron/send-reminders` route scheduled hourly. Verify it includes:
+
+```json
+{
+  "crons": [
+    {
+      "path": "/api/cron/close-votes",
+      "schedule": "*/5 * * * *"
+    },
+    {
+      "path": "/api/cron/send-reminders",
+      "schedule": "0 * * * *"
+    }
+  ]
+}
+```
+
+5. Verify the app compiles:
+
+```bash
+cd /Users/briantse/Projects/group-vote
+npm run build
+```
+
+6. Commit:
+
+```bash
+git add supabase/migrations/00002_sent_reminders.sql src/app/api/cron/send-reminders/
+git commit -m "Add automatic reminder cron with halfway, 24h, and 2h windows for non-voters"
+```
+
+---
+
+## Deployment Checklist
+
+1. **Supabase Production Project** — create production project, run migrations, set up RLS policies
+2. **Environment Variables on Vercel** — NEXT_PUBLIC_SUPABASE_URL, NEXT_PUBLIC_SUPABASE_ANON_KEY, SUPABASE_SERVICE_ROLE_KEY, RESEND_API_KEY
+3. **Domain Setup** — configure custom domain in Vercel, update Supabase auth redirect URLs
+4. **Resend Domain Verification** — verify sending domain for email deliverability
+5. **Seed Admin Account** — insert admin email into members table
+6. **Cron Jobs** — verify Vercel Cron is configured for auto-close and reminder routes
+7. **Test End-to-End** — create a test vote, send magic link, cast vote, close vote, verify results
