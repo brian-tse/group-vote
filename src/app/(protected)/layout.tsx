@@ -12,9 +12,15 @@ export default async function ProtectedLayout({
       <header className="border-b bg-white">
         <div className="mx-auto flex max-w-5xl items-center justify-between px-4 py-3">
           <a href="/dashboard" className="text-lg font-bold text-gray-900">
-            Group Vote
+            ACAMG Voting
           </a>
           <div className="flex items-center gap-4">
+            <a
+              href="/dashboard"
+              className="text-sm text-gray-600 hover:text-gray-900"
+            >
+              Home
+            </a>
             <a
               href="/propose"
               className="text-sm text-gray-600 hover:text-gray-900"

@@ -5,9 +5,9 @@ const APP_URL = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
  */
 export function magicLinkEmail(magicLinkUrl: string) {
   return {
-    subject: "Your Group Vote login link",
+    subject: "Your ACAMG Voting login link",
     bodyHtml: `
-      <h2>Sign in to Group Vote</h2>
+      <h2>Sign in to ACAMG Voting</h2>
       <p>Click the button below to sign in. This link expires in 15 minutes.</p>
       <p style="text-align: center; margin: 24px 0;">
         <a href="${magicLinkUrl}" class="btn">Sign In</a>

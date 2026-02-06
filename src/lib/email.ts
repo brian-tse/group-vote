@@ -14,7 +14,7 @@ function getResendClient(): Resend {
   return resendClient;
 }
 
-const FROM_ADDRESS = "Group Vote <votes@yourdomain.com>";
+const FROM_ADDRESS = "ACAMG Voting <votes@yourdomain.com>";
 
 /**
  * Base email layout that wraps all transactional emails.
@@ -47,7 +47,7 @@ function wrapInTemplate(bodyHtml: string): string {
   <div class="container">
     <div class="card">
       <div class="header">
-        <h1>Group Vote</h1>
+        <h1>ACAMG Voting</h1>
         <p>Anesthesia Group Voting System</p>
       </div>
       <div class="body">
@@ -56,7 +56,7 @@ function wrapInTemplate(bodyHtml: string): string {
     </div>
     <div class="footer">
       <p>
-        This is an automated message from Group Vote.<br />
+        This is an automated message from ACAMG Voting.<br />
         You're receiving this because you're a member of the anesthesia group.
       </p>
     </div>
@@ -72,7 +72,7 @@ export interface SendEmailParams {
 }
 
 /**
- * Send a single email using Resend with the Group Vote template.
+ * Send a single email using Resend with the ACAMG Voting template.
  */
 export async function sendEmail(params: SendEmailParams): Promise<void> {
   const resend = getResendClient();
