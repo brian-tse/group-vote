@@ -71,7 +71,7 @@ export function VoteTypeHelp() {
             className="fixed inset-0 z-40"
             onClick={() => setOpen(false)}
           />
-          <div className="absolute left-0 top-7 z-50 w-96 rounded-lg border bg-white p-4 shadow-lg">
+          <div className="fixed inset-x-4 top-auto z-50 rounded-lg border bg-white p-4 shadow-lg sm:absolute sm:inset-x-auto sm:left-0 sm:top-7 sm:w-96">
             <div className="mb-3 flex items-center justify-between">
               <h3 className="text-sm font-semibold text-gray-900">
                 Vote Types Explained

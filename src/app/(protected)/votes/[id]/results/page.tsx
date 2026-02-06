@@ -457,7 +457,7 @@ export default async function ResultsPage({
                 {rsvpResult.totalBallots !== 1 ? "s" : ""} received
               </p>
             </div>
-            <div className="grid grid-cols-3 gap-4">
+            <div className="grid grid-cols-3 gap-3 sm:gap-4">
               <div className="rounded-lg border bg-green-50 p-5 text-center">
                 <div className="text-sm font-medium text-green-700">Going</div>
                 <div className="mt-2 text-3xl font-bold text-green-800">

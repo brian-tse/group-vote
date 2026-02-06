@@ -44,7 +44,7 @@ export default async function VotesPage() {
       </div>
 
       {/* Stats summary */}
-      <div className="grid grid-cols-3 gap-4">
+      <div className="grid grid-cols-3 gap-3 sm:gap-4">
         <div className="rounded-lg border bg-white p-4 text-center">
           <div className="text-2xl font-bold text-green-600">
             {votedIn.length}

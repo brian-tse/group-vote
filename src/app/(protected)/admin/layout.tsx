@@ -9,7 +9,7 @@ export default async function AdminLayout({
 
   return (
     <div className="space-y-6">
-      <nav className="flex gap-4 border-b border-navy-100 pb-3">
+      <nav className="flex gap-4 overflow-x-auto border-b border-navy-100 pb-3">
         <a
           href="/admin/votes"
           className="text-sm font-medium text-navy-400 hover:text-brand-500"
