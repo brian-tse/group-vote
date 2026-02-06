@@ -1,7 +1,7 @@
 "use client";
 
 import { useTransition } from "react";
-import { openVote, closeVote } from "@/lib/actions/vote-admin-actions";
+import { openVote, closeVote, deleteVote } from "@/lib/actions/vote-admin-actions";
 
 interface VoteAdminControlsProps {
   voteId: string;
@@ -26,6 +26,18 @@ export function VoteAdminControls({ voteId, status }: VoteAdminControlsProps) {
     });
   }
 
+  function handleDelete() {
+    if (
+      !confirm(
+        "Permanently delete this vote and all its ballots? This cannot be undone."
+      )
+    )
+      return;
+    startTransition(() => {
+      deleteVote(voteId);
+    });
+  }
+
   return (
     <div className="flex gap-3">
       {status === "draft" && (
@@ -46,6 +58,13 @@ export function VoteAdminControls({ voteId, status }: VoteAdminControlsProps) {
           {isPending ? "Closing..." : "Close Vote"}
         </button>
       )}
+      <button
+        onClick={handleDelete}
+        disabled={isPending}
+        className="rounded-lg border border-red-300 px-4 py-2 text-sm font-semibold text-red-600 shadow-sm hover:bg-red-50 disabled:opacity-50"
+      >
+        {isPending ? "Deleting..." : "Delete Vote"}
+      </button>
     </div>
   );
 }

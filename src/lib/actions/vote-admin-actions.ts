@@ -3,6 +3,7 @@
 import { requireAdmin } from "@/lib/auth";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
 
 /**
  * Open a vote — changes status from draft to open and records the opened_at timestamp.
@@ -78,4 +79,40 @@ export async function closeVote(voteId: string): Promise<void> {
   revalidatePath(`/votes/${voteId}`);
   revalidatePath("/admin/votes");
   revalidatePath("/dashboard");
+}
+
+/**
+ * Delete a vote and all associated data (ballots, participation records).
+ */
+export async function deleteVote(voteId: string): Promise<void> {
+  await requireAdmin();
+  const adminClient = createAdminClient();
+
+  const { data: vote, error: fetchError } = await adminClient
+    .from("votes")
+    .select("id")
+    .eq("id", voteId)
+    .single();
+
+  if (fetchError || !vote) {
+    throw new Error("Vote not found.");
+  }
+
+  // Delete related records first (ballots, participation records, reminders)
+  await adminClient.from("ballots").delete().eq("vote_id", voteId);
+  await adminClient.from("participation_records").delete().eq("vote_id", voteId);
+  await adminClient.from("sent_reminders").delete().eq("vote_id", voteId);
+
+  const { error } = await adminClient
+    .from("votes")
+    .delete()
+    .eq("id", voteId);
+
+  if (error) {
+    throw new Error(`Failed to delete vote: ${error.message}`);
+  }
+
+  revalidatePath("/admin/votes");
+  revalidatePath("/dashboard");
+  redirect("/admin/votes");
 }
