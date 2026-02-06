@@ -36,7 +36,7 @@ export default async function VotesPage() {
     totalClosed > 0 ? Math.round((votedIn.length / totalClosed) * 100) : 0;
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-8">
       <div>
         <h1 className="text-2xl font-bold text-gray-900">
           My Voting History
@@ -58,7 +58,7 @@ export default async function VotesPage() {
           <div className="text-sm text-gray-500">Votes missed</div>
         </div>
         <div className="rounded-lg border bg-white p-4 text-center">
-          <div className="text-2xl font-bold text-blue-600">
+          <div className="text-2xl font-bold text-brand-500">
             {participationRate}%
           </div>
           <div className="text-sm text-gray-500">Participation rate</div>
@@ -78,7 +78,7 @@ export default async function VotesPage() {
               <a
                 key={vote.id}
                 href={`/votes/${vote.id}/results`}
-                className="flex items-center justify-between rounded-lg border bg-white px-4 py-3 shadow-sm hover:border-blue-300"
+                className="flex items-center justify-between rounded-lg border bg-white px-5 py-4 shadow-sm hover:border-brand-300"
               >
                 <div>
                   <span className="font-medium text-gray-900">
@@ -109,7 +109,7 @@ export default async function VotesPage() {
               <a
                 key={vote.id}
                 href={`/votes/${vote.id}/results`}
-                className="flex items-center justify-between rounded-lg border bg-white px-4 py-3 shadow-sm hover:border-blue-300"
+                className="flex items-center justify-between rounded-lg border bg-white px-5 py-4 shadow-sm hover:border-brand-300"
               >
                 <div>
                   <span className="font-medium text-gray-900">

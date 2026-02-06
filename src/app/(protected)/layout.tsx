@@ -8,50 +8,51 @@ export default async function ProtectedLayout({
   const member = await getCurrentMember();
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <header className="border-b bg-white">
+    <div className="min-h-screen bg-background">
+      <header className="border-b border-navy-700 bg-navy-500">
         <div className="mx-auto flex max-w-5xl items-center justify-between px-4 py-3">
-          <a href="/dashboard" className="text-lg font-bold text-gray-900">
+          <a href="/dashboard" className="text-lg font-bold text-white">
             ACAMG Voting
           </a>
           <div className="flex items-center gap-4">
             <a
               href="/dashboard"
-              className="text-sm text-gray-600 hover:text-gray-900"
+              className="text-sm text-white/70 hover:text-white"
             >
               Home
             </a>
             <a
               href="/propose"
-              className="text-sm text-gray-600 hover:text-gray-900"
+              className="text-sm text-white/70 hover:text-white"
             >
               Propose
             </a>
             <a
               href="/votes"
-              className="text-sm text-gray-600 hover:text-gray-900"
+              className="text-sm text-white/70 hover:text-white"
             >
               History
+            </a>
+            <a
+              href="/help"
+              className="text-sm text-white/70 hover:text-white"
+            >
+              Help
             </a>
             {member.role === "admin" && (
               <a
                 href="/admin/votes"
-                className="text-sm text-gray-600 hover:text-gray-900"
+                className="text-sm text-white/70 hover:text-white"
               >
                 Admin
               </a>
             )}
-            <a
-              href="/help"
-              className="text-sm text-gray-600 hover:text-gray-900"
-            >
-              Help
-            </a>
-            <span className="text-sm text-gray-500">{member.email}</span>
+            <span className="text-sm text-white/50">{member.email}</span>
+            <span className="text-white/30">·</span>
             <form action="/auth/signout" method="post">
               <button
                 type="submit"
-                className="text-sm text-gray-500 hover:text-gray-900"
+                className="text-sm text-white/50 hover:text-white"
               >
                 Sign out
               </button>
@@ -59,7 +60,7 @@ export default async function ProtectedLayout({
           </div>
         </div>
       </header>
-      <main className="mx-auto max-w-5xl px-4 py-6">{children}</main>
+      <main className="mx-auto max-w-5xl px-4 py-8">{children}</main>
     </div>
   );
 }

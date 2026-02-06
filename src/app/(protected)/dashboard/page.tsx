@@ -42,7 +42,7 @@ export default async function DashboardPage() {
   const pendingCount = pendingVotes.length;
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-8">
       <div>
         <h1 className="text-2xl font-bold text-gray-900">
           Welcome, {member.name || member.email}
@@ -51,8 +51,8 @@ export default async function DashboardPage() {
 
       {/* Open votes banner */}
       {pendingCount > 0 && (
-        <div className="rounded-lg border-l-4 border-blue-500 bg-blue-50 p-4">
-          <p className="font-semibold text-blue-800">
+        <div className="rounded-lg border-l-4 border-brand-500 bg-brand-50 p-4">
+          <p className="font-semibold text-brand-800">
             You have {pendingCount} open vote{pendingCount !== 1 ? "s" : ""}{" "}
             awaiting your ballot.
           </p>
@@ -74,7 +74,9 @@ export default async function DashboardPage() {
                 <a
                   key={vote.id}
                   href={`/votes/${vote.id}`}
-                  className="flex items-center justify-between rounded-lg border bg-white px-4 py-3 shadow-sm hover:border-blue-300 hover:shadow"
+                  className={`flex items-center justify-between rounded-lg border bg-white px-5 py-4 shadow-sm hover:border-brand-300 hover:shadow ${
+                    !hasVoted ? "border-l-4 border-brand-500" : ""
+                  }`}
                 >
                   <div>
                     <span className="font-medium text-gray-900">
@@ -121,7 +123,7 @@ export default async function DashboardPage() {
               <a
                 key={vote.id}
                 href={`/votes/${vote.id}/results`}
-                className="flex items-center justify-between rounded-lg border bg-white px-4 py-3 shadow-sm hover:border-blue-300 hover:shadow"
+                className="flex items-center justify-between rounded-lg border bg-white px-5 py-4 shadow-sm hover:border-brand-300 hover:shadow"
               >
                 <div>
                   <span className="font-medium text-gray-900">
@@ -134,7 +136,7 @@ export default async function DashboardPage() {
                       : "recently"}
                   </div>
                 </div>
-                <span className="rounded-full bg-blue-100 px-2 py-0.5 text-xs font-medium text-blue-800">
+                <span className="rounded-full bg-navy-100 px-2 py-0.5 text-xs font-medium text-navy-500">
                   View results
                 </span>
               </a>
@@ -147,20 +149,20 @@ export default async function DashboardPage() {
       <div className="flex gap-3">
         <a
           href="/propose"
-          className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+          className="rounded-lg border border-brand-300 px-4 py-2 text-sm font-medium text-brand-700 hover:bg-brand-50"
         >
           Propose a Vote
         </a>
         <a
           href="/history"
-          className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+          className="rounded-lg border border-brand-300 px-4 py-2 text-sm font-medium text-brand-700 hover:bg-brand-50"
         >
           My Voting History
         </a>
         {member.role === "admin" && (
           <a
             href="/admin/votes"
-            className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+            className="rounded-lg border border-brand-300 px-4 py-2 text-sm font-medium text-brand-700 hover:bg-brand-50"
           >
             Manage Votes
           </a>

@@ -83,7 +83,7 @@ export function ProposeForm() {
           required
           value={title}
           onChange={(e) => setTitle(e.target.value)}
-          className="mt-1 block w-full rounded-lg border border-gray-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+          className="mt-1 block w-full rounded-lg border border-gray-300 px-3 py-2 shadow-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
           placeholder="e.g., Should we adopt a new call schedule format?"
         />
         {state.fieldErrors.title && (
@@ -107,7 +107,7 @@ export function ProposeForm() {
           rows={4}
           value={description}
           onChange={(e) => setDescription(e.target.value)}
-          className="mt-1 block w-full rounded-lg border border-gray-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+          className="mt-1 block w-full rounded-lg border border-gray-300 px-3 py-2 shadow-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
           placeholder="Provide context so the group understands what they're voting on..."
         />
       </div>
@@ -125,7 +125,7 @@ export function ProposeForm() {
           name="format"
           value={format}
           onChange={(e) => setFormat(e.target.value as VoteFormat)}
-          className="mt-1 block w-full rounded-lg border border-gray-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+          className="mt-1 block w-full rounded-lg border border-gray-300 px-3 py-2 shadow-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
         >
           {Object.entries(VOTE_FORMAT_LABELS).map(([value, label]) => (
             <option key={value} value={value}>
@@ -142,7 +142,7 @@ export function ProposeForm() {
 
       {/* RSVP hint — no options needed */}
       {isRsvp && (
-        <div className="rounded-lg bg-blue-50 px-4 py-3 text-sm text-blue-700">
+        <div className="rounded-lg bg-navy-50 px-4 py-3 text-sm text-navy-500">
           RSVP options (Going, Not Going, Maybe) will be created automatically.
         </div>
       )}
@@ -163,7 +163,7 @@ export function ProposeForm() {
             min={1}
             value={maxSelections}
             onChange={(e) => setMaxSelections(parseInt(e.target.value, 10) || 1)}
-            className="mt-1 block w-32 rounded-lg border border-gray-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+            className="mt-1 block w-32 rounded-lg border border-gray-300 px-3 py-2 shadow-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
           />
           <p className="mt-1 text-xs text-gray-500">
             How many options each voter can select.
@@ -197,7 +197,7 @@ export function ProposeForm() {
                       updated[idx] = { ...updated[idx], label: e.target.value };
                       setOptions(updated);
                     }}
-                    className="block w-full rounded-lg border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                    className="block w-full rounded-lg border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
                   />
                 </div>
                 <div className="flex-1">
@@ -211,7 +211,7 @@ export function ProposeForm() {
                       updated[idx] = { ...updated[idx], description: e.target.value };
                       setOptions(updated);
                     }}
-                    className="block w-full rounded-lg border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                    className="block w-full rounded-lg border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
                   />
                 </div>
                 {options.length > 2 && (
@@ -229,7 +229,7 @@ export function ProposeForm() {
           <button
             type="button"
             onClick={addOption}
-            className="mt-2 text-sm font-medium text-blue-600 hover:text-blue-800"
+            className="mt-2 text-sm font-medium text-brand-500 hover:text-brand-700"
           >
             + Add option
           </button>
@@ -276,7 +276,7 @@ export function ProposeForm() {
                       updated[idx] = e.target.value;
                       setDateOptions(updated);
                     }}
-                    className="block w-full rounded-lg border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                    className="block w-full rounded-lg border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
                   />
                 </div>
                 {dateOptions.length > 2 && (
@@ -294,7 +294,7 @@ export function ProposeForm() {
           <button
             type="button"
             onClick={addDateOption}
-            className="mt-2 text-sm font-medium text-blue-600 hover:text-blue-800"
+            className="mt-2 text-sm font-medium text-brand-500 hover:text-brand-700"
           >
             + Add date option
           </button>
@@ -318,7 +318,7 @@ export function ProposeForm() {
           id="privacy_level"
           name="privacy_level"
           defaultValue="anonymous"
-          className="mt-1 block w-full rounded-lg border border-gray-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+          className="mt-1 block w-full rounded-lg border border-gray-300 px-3 py-2 shadow-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
         >
           {Object.entries(PRIVACY_LEVEL_LABELS).map(([value, label]) => (
             <option key={value} value={value}>
@@ -343,7 +343,7 @@ export function ProposeForm() {
           min={0}
           max={100}
           defaultValue={QUORUM_DEFAULT}
-          className="mt-1 block w-32 rounded-lg border border-gray-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+          className="mt-1 block w-32 rounded-lg border border-gray-300 px-3 py-2 shadow-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
         />
         {state.fieldErrors.quorum_percentage && (
           <p className="mt-1 text-sm text-red-600">
@@ -367,7 +367,7 @@ export function ProposeForm() {
           onChange={(e) =>
             setShowCustomThreshold(e.target.value === "custom")
           }
-          className="mt-1 block w-full rounded-lg border border-gray-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+          className="mt-1 block w-full rounded-lg border border-gray-300 px-3 py-2 shadow-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
         >
           {Object.entries(PASSING_THRESHOLD_LABELS).map(([value, label]) => (
             <option key={value} value={value}>
@@ -398,7 +398,7 @@ export function ProposeForm() {
             min={1}
             max={100}
             required
-            className="mt-1 block w-32 rounded-lg border border-gray-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+            className="mt-1 block w-32 rounded-lg border border-gray-300 px-3 py-2 shadow-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
           />
           {state.fieldErrors.custom_threshold_percentage && (
             <p className="mt-1 text-sm text-red-600">
@@ -413,7 +413,7 @@ export function ProposeForm() {
         <button
           type="submit"
           disabled={isPending}
-          className="rounded-lg bg-blue-600 px-6 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-blue-500 disabled:opacity-50"
+          className="rounded-lg bg-brand-500 px-6 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-brand-700 disabled:opacity-50"
         >
           {isPending ? "Submitting..." : "Submit Proposal"}
         </button>

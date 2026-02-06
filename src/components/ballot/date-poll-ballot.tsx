@@ -128,7 +128,7 @@ export function DatePollBallot({
       <button
         onClick={() => onVote(responses)}
         disabled={disabled || !allAnswered}
-        className="w-full rounded-lg bg-blue-600 px-6 py-3 text-sm font-semibold text-white shadow-sm hover:bg-blue-500 disabled:opacity-50"
+        className="w-full rounded-lg bg-brand-500 px-6 py-3 text-sm font-semibold text-white shadow-sm hover:bg-brand-700 disabled:opacity-50"
       >
         {currentResponses ? "Update Availability" : "Submit Availability"}
       </button>

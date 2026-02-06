@@ -30,13 +30,13 @@ export function YesNoBallot({
         disabled={disabled}
         className={`flex-1 rounded-lg border-2 px-6 py-4 text-lg font-semibold transition-colors disabled:opacity-50 ${
           currentChoice === yesOption.id
-            ? "border-green-600 bg-green-50 text-green-700"
+            ? "border-green-600 bg-green-50 text-green-700 vote-select"
             : "border-gray-200 bg-white text-gray-700 hover:border-green-300 hover:bg-green-50"
         }`}
       >
         Yes
         {currentChoice === yesOption.id && (
-          <span className="ml-2 text-sm font-normal">(your vote)</span>
+          <span className="ml-2 text-sm font-normal text-brand-600">(your vote)</span>
         )}
       </button>
       <button
@@ -44,13 +44,13 @@ export function YesNoBallot({
         disabled={disabled}
         className={`flex-1 rounded-lg border-2 px-6 py-4 text-lg font-semibold transition-colors disabled:opacity-50 ${
           currentChoice === noOption.id
-            ? "border-red-600 bg-red-50 text-red-700"
+            ? "border-red-600 bg-red-50 text-red-700 vote-select"
             : "border-gray-200 bg-white text-gray-700 hover:border-red-300 hover:bg-red-50"
         }`}
       >
         No
         {currentChoice === noOption.id && (
-          <span className="ml-2 text-sm font-normal">(your vote)</span>
+          <span className="ml-2 text-sm font-normal text-brand-600">(your vote)</span>
         )}
       </button>
     </div>

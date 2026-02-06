@@ -74,7 +74,7 @@ export function MemberRow({ member }: { member: Member }) {
         <button
           onClick={handleToggle}
           disabled={isPending}
-          className="mr-2 text-blue-600 hover:text-blue-800 disabled:opacity-50"
+          className="mr-2 text-brand-500 hover:text-brand-700 disabled:opacity-50"
         >
           {member.active ? "Deactivate" : "Activate"}
         </button>

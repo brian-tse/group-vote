@@ -54,14 +54,14 @@ export function ApprovalBallot({
               disabled={disabled}
               className={`flex w-full items-center gap-3 rounded-lg border-2 px-4 py-3 text-left transition-colors disabled:opacity-50 ${
                 isChecked
-                  ? "border-blue-600 bg-blue-50"
-                  : "border-gray-200 bg-white hover:border-blue-300 hover:bg-blue-50"
+                  ? "border-brand-500 bg-brand-50 vote-select"
+                  : "border-gray-200 bg-white hover:border-brand-300 hover:bg-brand-50"
               }`}
             >
               <div
                 className={`flex h-5 w-5 shrink-0 items-center justify-center rounded border-2 ${
                   isChecked
-                    ? "border-blue-600 bg-blue-600"
+                    ? "border-brand-500 bg-brand-500"
                     : "border-gray-300"
                 }`}
               >
@@ -84,7 +84,7 @@ export function ApprovalBallot({
               <div className="flex-1">
                 <span
                   className={`font-medium ${
-                    isChecked ? "text-blue-700" : "text-gray-900"
+                    isChecked ? "text-brand-700" : "text-gray-900"
                   }`}
                 >
                   {option.label}
@@ -96,7 +96,7 @@ export function ApprovalBallot({
                 )}
               </div>
               {isChecked && (
-                <span className="ml-auto text-xs font-medium text-blue-600">
+                <span className="ml-auto text-xs font-medium text-brand-600">
                   Approved
                 </span>
               )}
@@ -108,7 +108,7 @@ export function ApprovalBallot({
       <button
         onClick={() => onVote(approved)}
         disabled={disabled || approved.length === 0}
-        className="w-full rounded-lg bg-blue-600 px-6 py-3 text-sm font-semibold text-white shadow-sm hover:bg-blue-500 disabled:opacity-50"
+        className="w-full rounded-lg bg-brand-500 px-6 py-3 text-sm font-semibold text-white shadow-sm hover:bg-brand-700 disabled:opacity-50"
       >
         {currentApproved ? "Update Approvals" : "Submit Approvals"}
       </button>

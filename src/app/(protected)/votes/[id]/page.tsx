@@ -125,7 +125,7 @@ export default async function VoteDetailPage({ params }: Props) {
   }
 
   return (
-    <div className="mx-auto max-w-2xl space-y-6">
+    <div className="mx-auto max-w-2xl space-y-8">
       <div>
         <div className="flex items-center gap-3">
           <h1 className="text-2xl font-bold text-gray-900">{typedVote.title}</h1>
@@ -142,7 +142,7 @@ export default async function VoteDetailPage({ params }: Props) {
         <VoteAdminControls voteId={typedVote.id} status={typedVote.status} />
       )}
 
-      <div className="rounded-lg border bg-white p-4 shadow-sm">
+      <div className="rounded-lg border bg-white p-5 shadow-sm">
         <h2 className="text-sm font-semibold text-gray-900">Vote Configuration</h2>
         <dl className="mt-3 grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
           <dt className="text-gray-500">Format</dt>
@@ -173,7 +173,7 @@ export default async function VoteDetailPage({ params }: Props) {
       </div>
 
       {typedVote.status === "open" && (
-        <div className="rounded-lg border bg-white p-4 shadow-sm">
+        <div className="rounded-lg border bg-white p-5 shadow-sm">
           <h2 className="text-sm font-semibold text-gray-900">Participation</h2>
           <div className="mt-2">
             <div className="flex justify-between text-sm">
@@ -191,7 +191,7 @@ export default async function VoteDetailPage({ params }: Props) {
             </div>
             <div className="mt-1 h-2 w-full overflow-hidden rounded-full bg-gray-200">
               <div
-                className="h-2 rounded-full bg-blue-600 transition-all"
+                className="h-2 rounded-full bg-brand-500 transition-all"
                 style={{
                   width: `${
                     totalMembers
@@ -208,7 +208,7 @@ export default async function VoteDetailPage({ params }: Props) {
       )}
 
       {typedVote.status === "open" && (
-        <div className="rounded-lg border bg-white p-4 shadow-sm">
+        <div className="rounded-lg border bg-white p-5 shadow-sm">
           <h2 className="text-sm font-semibold text-gray-900">Cast Your Vote</h2>
           <div className="mt-4">
             <BallotWrapper
@@ -232,11 +232,11 @@ export default async function VoteDetailPage({ params }: Props) {
       )}
 
       {typedVote.status === "closed" && (
-        <div className="rounded-lg border bg-white p-4 text-center shadow-sm">
+        <div className="rounded-lg border bg-white p-5 text-center shadow-sm">
           <p className="text-gray-600">This vote is closed.</p>
           <a
             href={`/votes/${id}/results`}
-            className="mt-2 inline-block text-sm font-medium text-blue-600 hover:text-blue-800"
+            className="mt-2 inline-block text-sm font-medium text-brand-500 hover:text-brand-700"
           >
             View Results
           </a>
@@ -244,7 +244,7 @@ export default async function VoteDetailPage({ params }: Props) {
       )}
 
       {typedVote.status !== "open" && typedVote.status !== "closed" && (
-        <div className="rounded-lg border bg-white p-4 shadow-sm">
+        <div className="rounded-lg border bg-white p-5 shadow-sm">
           <h2 className="text-sm font-semibold text-gray-900">Options</h2>
           <ul className="mt-3 space-y-2">
             {typedOptions.map((option) => (

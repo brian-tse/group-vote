@@ -55,7 +55,7 @@ export default async function ResultsPage({
         </p>
         <a
           href={`/votes/${id}`}
-          className="mt-4 inline-block text-blue-600 hover:text-blue-800"
+          className="mt-4 inline-block text-brand-500 hover:text-brand-700"
         >
           Back to vote
         </a>
@@ -89,11 +89,11 @@ export default async function ResultsPage({
   const explanation = getResultExplanation(result);
 
   return (
-    <div className="mx-auto max-w-2xl space-y-6">
+    <div className="mx-auto max-w-2xl space-y-8">
       <div>
         <a
           href={`/votes/${id}`}
-          className="text-sm text-blue-600 hover:text-blue-800"
+          className="text-sm text-brand-500 hover:text-brand-700"
         >
           &larr; Back to vote
         </a>
@@ -111,7 +111,7 @@ export default async function ResultsPage({
       </div>
 
       {/* Status badge and explanation */}
-      <div className="rounded-lg border bg-white p-5">
+      <div className="rounded-lg border bg-white p-6">
         <div className="flex items-center gap-3">
           <span
             className={`inline-flex rounded-full px-3 py-1 text-sm font-semibold ${
@@ -161,7 +161,7 @@ export default async function ResultsPage({
 
       {/* Vote breakdown — bar chart */}
       {(result.format === "yes_no" || result.format === "multiple_choice") && (
-        <div className="rounded-lg border bg-white p-5">
+        <div className="rounded-lg border bg-white p-6">
           <h2 className="text-lg font-semibold text-gray-900">
             Vote Breakdown
           </h2>
@@ -183,7 +183,7 @@ export default async function ResultsPage({
                   <div className="flex items-center justify-between text-sm">
                     <span
                       className={`font-medium ${
-                        isWinner ? "text-blue-700" : "text-gray-700"
+                        isWinner ? "text-brand-700" : "text-gray-700"
                       }`}
                     >
                       {item.label}
@@ -196,7 +196,7 @@ export default async function ResultsPage({
                   <div className="mt-1 h-4 w-full overflow-hidden rounded-full bg-gray-200">
                     <div
                       className={`h-full rounded-full transition-all ${
-                        isWinner ? "bg-blue-600" : "bg-gray-400"
+                        isWinner ? "bg-brand-500" : "bg-gray-400"
                       }`}
                       style={{ width: `${percentage}%` }}
                     />
@@ -222,7 +222,7 @@ export default async function ResultsPage({
           {(result as RankedChoiceResult).rounds.map((round) => (
             <div
               key={round.roundNumber}
-              className="rounded-lg border bg-white p-5"
+              className="rounded-lg border bg-white p-6"
             >
               <div className="flex items-center justify-between">
                 <h3 className="font-semibold text-gray-900">
@@ -279,7 +279,7 @@ export default async function ResultsPage({
                               ? "bg-red-300"
                               : isWinner
                                 ? "bg-green-500"
-                                : "bg-blue-400"
+                                : "bg-brand-400"
                           }`}
                           style={{ width: `${percentage}%` }}
                         />
@@ -297,7 +297,7 @@ export default async function ResultsPage({
       {result.format === "date_poll" && (() => {
         const datePollResult = result as DatePollResult;
         return (
-          <div className="rounded-lg border bg-white p-5">
+          <div className="rounded-lg border bg-white p-6">
             <h2 className="text-lg font-semibold text-gray-900">
               Date Poll Results
             </h2>
@@ -331,13 +331,13 @@ export default async function ResultsPage({
                       <tr
                         key={opt.optionId}
                         className={`border-b last:border-b-0 ${
-                          isWinner ? "bg-blue-50" : ""
+                          isWinner ? "bg-brand-50" : ""
                         }`}
                       >
                         <td className="py-3 pr-4">
                           <span
                             className={`font-medium ${
-                              isWinner ? "text-blue-700" : "text-gray-700"
+                              isWinner ? "text-brand-700" : "text-gray-700"
                             }`}
                           >
                             {opt.label}
@@ -373,7 +373,7 @@ export default async function ResultsPage({
       {result.format === "approval" && (() => {
         const approvalResult = result as ApprovalResult;
         return (
-          <div className="rounded-lg border bg-white p-5">
+          <div className="rounded-lg border bg-white p-6">
             <h2 className="text-lg font-semibold text-gray-900">
               Approval Results
             </h2>
@@ -397,7 +397,7 @@ export default async function ResultsPage({
                     <div className="flex items-center justify-between text-sm">
                       <span
                         className={`font-medium ${
-                          isWinner ? "text-blue-700" : "text-gray-700"
+                          isWinner ? "text-brand-700" : "text-gray-700"
                         }`}
                       >
                         {item.label}
@@ -411,7 +411,7 @@ export default async function ResultsPage({
                     <div className="mt-1 h-4 w-full overflow-hidden rounded-full bg-gray-200">
                       <div
                         className={`h-full rounded-full transition-all ${
-                          isWinner ? "bg-blue-600" : "bg-gray-400"
+                          isWinner ? "bg-brand-500" : "bg-gray-400"
                         }`}
                         style={{ width: `${percentage}%` }}
                       />
@@ -490,7 +490,7 @@ export default async function ResultsPage({
       {result.format === "score_rating" && (() => {
         const scoreResult = result as ScoreRatingResult;
         return (
-          <div className="rounded-lg border bg-white p-5">
+          <div className="rounded-lg border bg-white p-6">
             <h2 className="text-lg font-semibold text-gray-900">
               Score Ratings
             </h2>
@@ -510,13 +510,13 @@ export default async function ResultsPage({
                   <div
                     key={opt.optionId}
                     className={`rounded-lg border p-4 ${
-                      isWinner ? "border-blue-300 bg-blue-50" : "bg-gray-50"
+                      isWinner ? "border-brand-300 bg-brand-50" : "bg-gray-50"
                     }`}
                   >
                     <div className="flex items-center justify-between">
                       <span
                         className={`font-medium ${
-                          isWinner ? "text-blue-700" : "text-gray-700"
+                          isWinner ? "text-brand-700" : "text-gray-700"
                         }`}
                       >
                         {opt.label}
@@ -583,7 +583,7 @@ export default async function ResultsPage({
       {result.format === "multi_select" && (() => {
         const multiSelectResult = result as MultiSelectResult;
         return (
-          <div className="rounded-lg border bg-white p-5">
+          <div className="rounded-lg border bg-white p-6">
             <h2 className="text-lg font-semibold text-gray-900">
               Selection Results
             </h2>
@@ -607,7 +607,7 @@ export default async function ResultsPage({
                     <div className="flex items-center justify-between text-sm">
                       <span
                         className={`font-medium ${
-                          isWinner ? "text-blue-700" : "text-gray-700"
+                          isWinner ? "text-brand-700" : "text-gray-700"
                         }`}
                       >
                         {item.label}
@@ -621,7 +621,7 @@ export default async function ResultsPage({
                     <div className="mt-1 h-4 w-full overflow-hidden rounded-full bg-gray-200">
                       <div
                         className={`h-full rounded-full transition-all ${
-                          isWinner ? "bg-blue-600" : "bg-gray-400"
+                          isWinner ? "bg-brand-500" : "bg-gray-400"
                         }`}
                         style={{ width: `${percentage}%` }}
                       />

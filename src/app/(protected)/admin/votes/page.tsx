@@ -10,7 +10,7 @@ const STATUS_STYLES: Record<string, string> = {
   draft: "bg-gray-100 text-gray-800",
   pending_review: "bg-yellow-100 text-yellow-800",
   open: "bg-green-100 text-green-800",
-  closed: "bg-blue-100 text-blue-800",
+  closed: "bg-navy-100 text-navy-500",
 };
 
 export default async function AdminVotesPage() {
@@ -37,7 +37,7 @@ export default async function AdminVotesPage() {
         </div>
         <a
           href="/votes/new"
-          className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-blue-500"
+          className="rounded-lg bg-brand-500 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-brand-700"
         >
           Create Vote
         </a>
@@ -57,7 +57,7 @@ export default async function AdminVotesPage() {
               <div>
                 <a
                   href={`/votes/${vote.id}`}
-                  className="font-medium text-gray-900 hover:text-blue-600"
+                  className="font-medium text-gray-900 hover:text-brand-500"
                 >
                   {vote.title}
                 </a>

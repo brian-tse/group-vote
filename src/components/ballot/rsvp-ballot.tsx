@@ -42,13 +42,13 @@ export function RsvpBallot({
           disabled={disabled}
           className={`flex-1 rounded-lg border-2 px-6 py-4 text-lg font-semibold transition-colors disabled:opacity-50 ${
             currentResponse === option.value
-              ? option.activeClass
+              ? `${option.activeClass} vote-select`
               : `border-gray-200 bg-white text-gray-700 ${option.hoverClass}`
           }`}
         >
           {option.label}
           {currentResponse === option.value && (
-            <span className="ml-2 text-sm font-normal">(your response)</span>
+            <span className="ml-2 text-sm font-normal text-brand-600">(your response)</span>
           )}
         </button>
       ))}

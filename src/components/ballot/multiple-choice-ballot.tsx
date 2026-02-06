@@ -25,14 +25,14 @@ export function MultipleChoiceBallot({
           disabled={disabled}
           className={`flex w-full items-center gap-3 rounded-lg border-2 px-4 py-3 text-left transition-colors disabled:opacity-50 ${
             currentChoice === option.id
-              ? "border-blue-600 bg-blue-50"
-              : "border-gray-200 bg-white hover:border-blue-300 hover:bg-blue-50"
+              ? "border-brand-500 bg-brand-50 vote-select"
+              : "border-gray-200 bg-white hover:border-brand-300 hover:bg-brand-50"
           }`}
         >
           <div
             className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full border-2 ${
               currentChoice === option.id
-                ? "border-blue-600 bg-blue-600"
+                ? "border-brand-500 bg-brand-500"
                 : "border-gray-300"
             }`}
           >
@@ -44,7 +44,7 @@ export function MultipleChoiceBallot({
             <span
               className={`font-medium ${
                 currentChoice === option.id
-                  ? "text-blue-700"
+                  ? "text-brand-700"
                   : "text-gray-900"
               }`}
             >
@@ -57,7 +57,7 @@ export function MultipleChoiceBallot({
             )}
           </div>
           {currentChoice === option.id && (
-            <span className="ml-auto text-xs font-medium text-blue-600">
+            <span className="ml-auto text-xs font-medium text-brand-600">
               Your vote
             </span>
           )}

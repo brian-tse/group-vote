@@ -55,7 +55,7 @@ function SortableItem({
       style={style}
       className={`flex items-center gap-3 rounded-lg border-2 bg-white px-4 py-3 ${
         isDragging
-          ? "z-10 border-blue-400 shadow-lg"
+          ? "z-10 border-brand-400 shadow-lg"
           : "border-gray-200"
       }`}
     >
@@ -79,7 +79,7 @@ function SortableItem({
           />
         </svg>
       </div>
-      <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-blue-100 text-sm font-bold text-blue-700">
+      <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-brand-100 text-sm font-bold text-brand-700">
         {rank}
       </div>
       <div className="flex-1">
@@ -165,7 +165,7 @@ export function RankedChoiceBallot({
       <button
         onClick={() => onVote(orderedIds)}
         disabled={disabled}
-        className="w-full rounded-lg bg-blue-600 px-6 py-3 text-sm font-semibold text-white shadow-sm hover:bg-blue-500 disabled:opacity-50"
+        className="w-full rounded-lg bg-brand-500 px-6 py-3 text-sm font-semibold text-white shadow-sm hover:bg-brand-700 disabled:opacity-50"
       >
         {currentRanking ? "Update Ranking" : "Submit Ranking"}
       </button>

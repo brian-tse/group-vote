@@ -1,8 +1,8 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --background: #F2F2F2;
+  --foreground: #383F48;
 }
 
 @theme inline {
@@ -10,17 +10,54 @@
   --color-foreground: var(--foreground);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
-}
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+  /* Brand crimson — ACAMG primary */
+  --color-brand-50: #FDF2F4;
+  --color-brand-100: #FADDDF;
+  --color-brand-200: #F0B0B8;
+  --color-brand-300: #E47F8D;
+  --color-brand-400: #D55068;
+  --color-brand-500: #BF2441;
+  --color-brand-600: #A91F39;
+  --color-brand-700: #8B1A2F;
+  --color-brand-800: #6B1424;
+  --color-brand-900: #4A0E19;
+
+  /* Navy — header / dark accents */
+  --color-navy-50: #EAF0F7;
+  --color-navy-100: #C5D1E3;
+  --color-navy-200: #8EA3C3;
+  --color-navy-300: #5A779F;
+  --color-navy-400: #334D73;
+  --color-navy-500: #0C2240;
+  --color-navy-600: #0A1D36;
+  --color-navy-700: #08162A;
+  --color-navy-800: #05101E;
+  --color-navy-900: #030912;
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
+}
+
+/* Smooth transitions for interactive elements */
+button,
+a,
+input,
+select,
+textarea {
+  transition: all 150ms ease;
+}
+
+/* Vote selection animation */
+@keyframes selectPop {
+  0% { transform: scale(1); }
+  50% { transform: scale(1.03); }
+  100% { transform: scale(1); }
+}
+
+.vote-select {
+  animation: selectPop 200ms ease-out;
 }

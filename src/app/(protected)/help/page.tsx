@@ -5,18 +5,18 @@ export default async function HelpPage() {
   const isAdmin = member.role === "admin";
 
   return (
-    <div className="mx-auto max-w-3xl space-y-8">
+    <div className="mx-auto max-w-3xl space-y-10">
       <div>
-        <h1 className="text-2xl font-bold text-gray-900">How to Use Group Vote</h1>
+        <h1 className="text-2xl font-bold text-gray-900">How to Use ACAMG Voting</h1>
         <p className="mt-1 text-sm text-gray-500">
           A quick guide to voting, proposing, and managing your group&apos;s decisions.
         </p>
       </div>
 
       {/* Getting Started */}
-      <section className="space-y-3">
+      <section className="space-y-4">
         <h2 className="text-lg font-semibold text-gray-900">Getting Started</h2>
-        <div className="rounded-lg border bg-white p-4 text-sm text-gray-700 space-y-2">
+        <div className="rounded-lg border bg-white p-6 text-sm text-gray-700 space-y-2">
           <p>
             <strong>Logging in:</strong> Enter your email on the login page and click{" "}
             <em>Send Login Link</em>. Check your inbox and click the link — you&apos;ll be
@@ -29,9 +29,9 @@ export default async function HelpPage() {
       </section>
 
       {/* Dashboard */}
-      <section className="space-y-3">
+      <section className="space-y-4">
         <h2 className="text-lg font-semibold text-gray-900">Dashboard</h2>
-        <div className="rounded-lg border bg-white p-4 text-sm text-gray-700 space-y-2">
+        <div className="rounded-lg border bg-white p-6 text-sm text-gray-700 space-y-2">
           <p>Your home screen shows:</p>
           <ul className="list-disc pl-5 space-y-1">
             <li><strong>Open Votes</strong> — Votes accepting ballots. Shows whether you&apos;ve voted or still need to.</li>
@@ -42,9 +42,9 @@ export default async function HelpPage() {
       </section>
 
       {/* Casting Your Vote */}
-      <section className="space-y-3">
+      <section className="space-y-4">
         <h2 className="text-lg font-semibold text-gray-900">Casting Your Vote</h2>
-        <div className="rounded-lg border bg-white p-4 text-sm text-gray-700 space-y-3">
+        <div className="rounded-lg border bg-white p-6 text-sm text-gray-700 space-y-4">
           <p>Click any open vote from the dashboard to see details and cast your ballot.</p>
           <div className="space-y-2">
             <p><strong>Yes / No</strong> — Click Yes or No. Recorded instantly.</p>
@@ -54,16 +54,16 @@ export default async function HelpPage() {
               to least. Click <em>Submit Ranking</em> when ready.
             </p>
           </div>
-          <div className="rounded bg-blue-50 p-3 text-blue-800">
+          <div className="rounded bg-navy-50 p-3 text-navy-500">
             You can change your vote anytime while the vote is open — just return to the vote page.
           </div>
         </div>
       </section>
 
       {/* Vote Settings */}
-      <section className="space-y-3">
+      <section className="space-y-4">
         <h2 className="text-lg font-semibold text-gray-900">Understanding Vote Settings</h2>
-        <div className="rounded-lg border bg-white p-4 text-sm text-gray-700">
+        <div className="rounded-lg border bg-white p-6 text-sm text-gray-700">
           <div className="overflow-x-auto">
             <table className="w-full text-left">
               <thead>
@@ -109,9 +109,9 @@ export default async function HelpPage() {
       </section>
 
       {/* Results */}
-      <section className="space-y-3">
+      <section className="space-y-4">
         <h2 className="text-lg font-semibold text-gray-900">Viewing Results</h2>
-        <div className="rounded-lg border bg-white p-4 text-sm text-gray-700 space-y-2">
+        <div className="rounded-lg border bg-white p-6 text-sm text-gray-700 space-y-2">
           <p>Once a vote is closed, click it to see:</p>
           <ul className="list-disc pl-5 space-y-1">
             <li><strong>Outcome</strong> — Passed, Failed, or Quorum Not Met</li>
@@ -125,9 +125,9 @@ export default async function HelpPage() {
       </section>
 
       {/* Proposing */}
-      <section className="space-y-3">
+      <section className="space-y-4">
         <h2 className="text-lg font-semibold text-gray-900">Proposing a Vote</h2>
-        <div className="rounded-lg border bg-white p-4 text-sm text-gray-700 space-y-2">
+        <div className="rounded-lg border bg-white p-6 text-sm text-gray-700 space-y-2">
           <p>Any member can suggest a vote:</p>
           <ol className="list-decimal pl-5 space-y-1">
             <li>Click <strong>Propose</strong> in the top nav</li>
@@ -143,9 +143,9 @@ export default async function HelpPage() {
       </section>
 
       {/* Voting History */}
-      <section className="space-y-3">
+      <section className="space-y-4">
         <h2 className="text-lg font-semibold text-gray-900">Your Voting History</h2>
-        <div className="rounded-lg border bg-white p-4 text-sm text-gray-700 space-y-2">
+        <div className="rounded-lg border bg-white p-6 text-sm text-gray-700 space-y-2">
           <p>
             Click <strong>History</strong> in the top nav to see your personal record — participation
             rate, votes you&apos;ve cast, and votes you missed.
@@ -164,11 +164,11 @@ export default async function HelpPage() {
             </p>
           </div>
 
-          <section className="space-y-3">
+          <section className="space-y-4">
             <h2 className="text-lg font-semibold text-gray-900">Managing Members</h2>
-            <div className="rounded-lg border bg-white p-4 text-sm text-gray-700 space-y-2">
+            <div className="rounded-lg border bg-white p-6 text-sm text-gray-700 space-y-2">
               <p>
-                Go to <strong>Admin → Members</strong> to manage who can access Group Vote:
+                Go to <strong>Admin → Members</strong> to manage who can access ACAMG Voting:
               </p>
               <ul className="list-disc pl-5 space-y-1">
                 <li><strong>Add</strong> — Enter a name and email. They can log in immediately.</li>
@@ -178,9 +178,9 @@ export default async function HelpPage() {
             </div>
           </section>
 
-          <section className="space-y-3">
+          <section className="space-y-4">
             <h2 className="text-lg font-semibold text-gray-900">Reviewing Proposals</h2>
-            <div className="rounded-lg border bg-white p-4 text-sm text-gray-700 space-y-2">
+            <div className="rounded-lg border bg-white p-6 text-sm text-gray-700 space-y-2">
               <p>
                 Go to <strong>Admin → Proposals</strong> to see member-submitted proposals:
               </p>
@@ -191,9 +191,9 @@ export default async function HelpPage() {
             </div>
           </section>
 
-          <section className="space-y-3">
+          <section className="space-y-4">
             <h2 className="text-lg font-semibold text-gray-900">Creating &amp; Managing Votes</h2>
-            <div className="rounded-lg border bg-white p-4 text-sm text-gray-700 space-y-2">
+            <div className="rounded-lg border bg-white p-6 text-sm text-gray-700 space-y-2">
               <p>
                 Go to <strong>Admin → Manage Votes → Create Vote</strong> to create a vote from
                 scratch. Fill in the details and click Create — it saves as a <strong>Draft</strong>.
@@ -206,9 +206,9 @@ export default async function HelpPage() {
             </div>
           </section>
 
-          <section className="space-y-3">
+          <section className="space-y-4">
             <h2 className="text-lg font-semibold text-gray-900">Participation Dashboard</h2>
-            <div className="rounded-lg border bg-white p-4 text-sm text-gray-700 space-y-2">
+            <div className="rounded-lg border bg-white p-6 text-sm text-gray-700 space-y-2">
               <p>
                 Go to <strong>Admin → Participation</strong> to see a table of all active members
                 with their vote counts and participation rates. Click column headers to sort.
@@ -222,9 +222,9 @@ export default async function HelpPage() {
       )}
 
       {/* Quick Reference */}
-      <section className="space-y-3">
+      <section className="space-y-4">
         <h2 className="text-lg font-semibold text-gray-900">Quick Reference</h2>
-        <div className="rounded-lg border bg-white p-4 text-sm text-gray-700">
+        <div className="rounded-lg border bg-white p-6 text-sm text-gray-700">
           <div className="overflow-x-auto">
             <table className="w-full text-left">
               <thead>

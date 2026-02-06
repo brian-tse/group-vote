@@ -14,7 +14,7 @@ function getResendClient(): Resend {
   return resendClient;
 }
 
-const FROM_ADDRESS = "ACAMG Voting <votes@yourdomain.com>";
+const FROM_ADDRESS = "ACAMG Voting <noreply@acamedicalgroup.com>";
 
 /**
  * Base email layout that wraps all transactional emails.
@@ -37,8 +37,8 @@ function wrapInTemplate(bodyHtml: string): string {
     .body { font-size: 15px; line-height: 1.6; color: #374151; }
     .body h2 { font-size: 18px; font-weight: 600; color: #111827; margin: 0 0 8px; }
     .body p { margin: 0 0 16px; }
-    .btn { display: inline-block; background: #2563eb; color: #ffffff !important; text-decoration: none; padding: 12px 24px; border-radius: 8px; font-weight: 600; font-size: 15px; }
-    .btn:hover { background: #1d4ed8; }
+    .btn { display: inline-block; background: #BF2441; color: #ffffff !important; text-decoration: none; padding: 12px 24px; border-radius: 8px; font-weight: 600; font-size: 15px; }
+    .btn:hover { background: #8B1A2F; }
     .footer { text-align: center; margin-top: 24px; font-size: 12px; color: #9ca3af; }
     .footer a { color: #6b7280; }
   </style>
@@ -46,6 +46,7 @@ function wrapInTemplate(bodyHtml: string): string {
 <body>
   <div class="container">
     <div class="card">
+      <div style="background: #0C2240; height: 4px; border-radius: 12px 12px 0 0; margin: -32px -32px 24px -32px;"></div>
       <div class="header">
         <h1>ACAMG Voting</h1>
         <p>Anesthesia Group Voting System</p>
