@@ -35,6 +35,12 @@ export default async function ProtectedLayout({
                 Admin
               </a>
             )}
+            <a
+              href="/help"
+              className="text-sm text-gray-600 hover:text-gray-900"
+            >
+              Help
+            </a>
             <span className="text-sm text-gray-500">{member.email}</span>
             <form action="/auth/signout" method="post">
               <button
