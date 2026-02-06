@@ -6,6 +6,9 @@ import {
   PASSING_THRESHOLD_LABELS,
 } from "@/lib/constants";
 import { notFound } from "next/navigation";
+import { cookies } from "next/headers";
+import { BallotWrapper } from "@/components/ballot/ballot-wrapper";
+import { VoteAdminControls } from "./vote-admin-controls";
 import type { Vote, VoteOption } from "@/lib/types";
 
 interface Props {
@@ -53,6 +56,53 @@ export default async function VoteDetailPage({ params }: Props) {
   const typedVote = vote as Vote;
   const typedOptions = (options || []) as VoteOption[];
 
+  // Check if the current member has already voted
+  const { data: participation } = await adminClient
+    .from("participation_records")
+    .select("id")
+    .eq("vote_id", id)
+    .eq("member_id", member.id)
+    .single();
+
+  const hasVoted = !!participation;
+
+  // Get existing choice for non-anonymous votes
+  let existingChoice: string | null = null;
+  let existingRanking: string[] | null = null;
+  let sessionToken: string | null = null;
+
+  if (hasVoted) {
+    if (typedVote.privacy_level === "anonymous") {
+      const cookieStore = await cookies();
+      sessionToken = cookieStore.get(`ballot_token_${id}`)?.value || null;
+      if (sessionToken) {
+        const { data: anonBallot } = await adminClient
+          .from("ballot_records_anonymous")
+          .select("choice")
+          .eq("id", sessionToken)
+          .eq("vote_id", id)
+          .single();
+        if (anonBallot) {
+          const choice = anonBallot.choice as Record<string, unknown>;
+          if ("option_id" in choice) existingChoice = choice.option_id as string;
+          if ("ranked" in choice) existingRanking = choice.ranked as string[];
+        }
+      }
+    } else {
+      const { data: namedBallot } = await adminClient
+        .from("ballot_records_named")
+        .select("choice")
+        .eq("vote_id", id)
+        .eq("member_id", member.id)
+        .single();
+      if (namedBallot) {
+        const choice = namedBallot.choice as Record<string, unknown>;
+        if ("option_id" in choice) existingChoice = choice.option_id as string;
+        if ("ranked" in choice) existingRanking = choice.ranked as string[];
+      }
+    }
+  }
+
   return (
     <div className="mx-auto max-w-2xl space-y-6">
       <div>
@@ -66,6 +116,10 @@ export default async function VoteDetailPage({ params }: Props) {
           <p className="mt-2 text-gray-600">{typedVote.description}</p>
         )}
       </div>
+
+      {member.role === "admin" && (
+        <VoteAdminControls voteId={typedVote.id} status={typedVote.status} />
+      )}
 
       <div className="rounded-lg border bg-white p-4 shadow-sm">
         <h2 className="text-sm font-semibold text-gray-900">Vote Configuration</h2>
@@ -132,28 +186,54 @@ export default async function VoteDetailPage({ params }: Props) {
         </div>
       )}
 
-      <div className="rounded-lg border bg-white p-4 shadow-sm">
-        <h2 className="text-sm font-semibold text-gray-900">Options</h2>
-        <ul className="mt-3 space-y-2">
-          {typedOptions.map((option) => (
-            <li
-              key={option.id}
-              className="rounded-lg border border-gray-200 px-4 py-3"
-            >
-              <span className="font-medium text-gray-900">{option.label}</span>
-              {option.description && (
-                <p className="mt-1 text-sm text-gray-500">
-                  {option.description}
-                </p>
-              )}
-            </li>
-          ))}
-        </ul>
-      </div>
-
       {typedVote.status === "open" && (
-        <div className="rounded-lg border-2 border-dashed border-gray-300 p-6 text-center text-sm text-gray-500">
-          Ballot casting will be implemented in Phase 7.
+        <div className="rounded-lg border bg-white p-4 shadow-sm">
+          <h2 className="text-sm font-semibold text-gray-900">Cast Your Vote</h2>
+          <div className="mt-4">
+            <BallotWrapper
+              voteId={typedVote.id}
+              format={typedVote.format}
+              privacyLevel={typedVote.privacy_level}
+              options={typedOptions}
+              existingChoice={existingChoice}
+              existingRanking={existingRanking}
+              hasVoted={hasVoted}
+              sessionToken={sessionToken}
+            />
+          </div>
+        </div>
+      )}
+
+      {typedVote.status === "closed" && (
+        <div className="rounded-lg border bg-white p-4 text-center shadow-sm">
+          <p className="text-gray-600">This vote is closed.</p>
+          <a
+            href={`/votes/${id}/results`}
+            className="mt-2 inline-block text-sm font-medium text-blue-600 hover:text-blue-800"
+          >
+            View Results
+          </a>
+        </div>
+      )}
+
+      {typedVote.status !== "open" && typedVote.status !== "closed" && (
+        <div className="rounded-lg border bg-white p-4 shadow-sm">
+          <h2 className="text-sm font-semibold text-gray-900">Options</h2>
+          <ul className="mt-3 space-y-2">
+            {typedOptions.map((option) => (
+              <li
+                key={option.id}
+                className="rounded-lg border border-gray-200 px-4 py-3"
+              >
+                <span className="font-medium text-gray-900">{option.label}</span>
+                {option.description && (
+                  <p className="mt-1 text-sm text-gray-500">
+                    {option.description}
+                  </p>
+                )}
+              </li>
+            ))}
+          </ul>
         </div>
       )}
     </div>

@@ -15,9 +15,21 @@ export default async function ProtectedLayout({
             Group Vote
           </a>
           <div className="flex items-center gap-4">
+            <a
+              href="/propose"
+              className="text-sm text-gray-600 hover:text-gray-900"
+            >
+              Propose
+            </a>
+            <a
+              href="/votes"
+              className="text-sm text-gray-600 hover:text-gray-900"
+            >
+              History
+            </a>
             {member.role === "admin" && (
               <a
-                href="/admin/members"
+                href="/admin/votes"
                 className="text-sm text-gray-600 hover:text-gray-900"
               >
                 Admin
