@@ -24,6 +24,8 @@ const FORMATS_WITH_OPTIONS: VoteFormat[] = [
 export function VoteForm() {
   const [state, formAction, isPending] = useActionState(createVote, initialState);
   const [format, setFormat] = useState<VoteFormat>("yes_no");
+  const [title, setTitle] = useState("");
+  const [description, setDescription] = useState("");
   const [showCustomThreshold, setShowCustomThreshold] = useState(false);
   const [options, setOptions] = useState([
     { label: "", description: "" },
@@ -73,6 +75,8 @@ export function VoteForm() {
           name="title"
           type="text"
           required
+          value={title}
+          onChange={(e) => setTitle(e.target.value)}
           className="mt-1 block w-full rounded-lg border border-gray-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
           placeholder="e.g., Approve 2026 call schedule policy"
         />
@@ -89,6 +93,8 @@ export function VoteForm() {
           id="description"
           name="description"
           rows={3}
+          value={description}
+          onChange={(e) => setDescription(e.target.value)}
           className="mt-1 block w-full rounded-lg border border-gray-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
           placeholder="Provide context for voters..."
         />
@@ -167,7 +173,12 @@ export function VoteForm() {
                     type="text"
                     required
                     placeholder={`Option ${idx + 1}`}
-                    defaultValue={opt.label}
+                    value={opt.label}
+                    onChange={(e) => {
+                      const updated = [...options];
+                      updated[idx] = { ...updated[idx], label: e.target.value };
+                      setOptions(updated);
+                    }}
                     className="block w-full rounded-lg border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
                   />
                 </div>
@@ -176,7 +187,12 @@ export function VoteForm() {
                     name={`option_description_${idx}`}
                     type="text"
                     placeholder="Description (optional)"
-                    defaultValue={opt.description}
+                    value={opt.description}
+                    onChange={(e) => {
+                      const updated = [...options];
+                      updated[idx] = { ...updated[idx], description: e.target.value };
+                      setOptions(updated);
+                    }}
                     className="block w-full rounded-lg border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
                   />
                 </div>
@@ -234,7 +250,12 @@ export function VoteForm() {
                     name={`option_date_${idx}`}
                     type={includeTime ? "datetime-local" : "date"}
                     required
-                    defaultValue={dt}
+                    value={dt}
+                    onChange={(e) => {
+                      const updated = [...dateOptions];
+                      updated[idx] = e.target.value;
+                      setDateOptions(updated);
+                    }}
                     className="block w-full rounded-lg border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
                   />
                 </div>

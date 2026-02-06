@@ -27,6 +27,8 @@ export function ProposeForm() {
     initialState
   );
   const [format, setFormat] = useState<VoteFormat>("yes_no");
+  const [title, setTitle] = useState("");
+  const [description, setDescription] = useState("");
   const [showCustomThreshold, setShowCustomThreshold] = useState(false);
   const [options, setOptions] = useState([
     { label: "", description: "" },
@@ -79,6 +81,8 @@ export function ProposeForm() {
           name="title"
           type="text"
           required
+          value={title}
+          onChange={(e) => setTitle(e.target.value)}
           className="mt-1 block w-full rounded-lg border border-gray-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
           placeholder="e.g., Should we adopt a new call schedule format?"
         />
@@ -101,6 +105,8 @@ export function ProposeForm() {
           id="description"
           name="description"
           rows={4}
+          value={description}
+          onChange={(e) => setDescription(e.target.value)}
           className="mt-1 block w-full rounded-lg border border-gray-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
           placeholder="Provide context so the group understands what they're voting on..."
         />
@@ -185,7 +191,12 @@ export function ProposeForm() {
                     type="text"
                     required
                     placeholder={`Option ${idx + 1}`}
-                    defaultValue={opt.label}
+                    value={opt.label}
+                    onChange={(e) => {
+                      const updated = [...options];
+                      updated[idx] = { ...updated[idx], label: e.target.value };
+                      setOptions(updated);
+                    }}
                     className="block w-full rounded-lg border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
                   />
                 </div>
@@ -194,7 +205,12 @@ export function ProposeForm() {
                     name={`option_description_${idx}`}
                     type="text"
                     placeholder="Description (optional)"
-                    defaultValue={opt.description}
+                    value={opt.description}
+                    onChange={(e) => {
+                      const updated = [...options];
+                      updated[idx] = { ...updated[idx], description: e.target.value };
+                      setOptions(updated);
+                    }}
                     className="block w-full rounded-lg border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
                   />
                 </div>
@@ -254,7 +270,12 @@ export function ProposeForm() {
                     name={`option_date_${idx}`}
                     type={includeTime ? "datetime-local" : "date"}
                     required
-                    defaultValue={dt}
+                    value={dt}
+                    onChange={(e) => {
+                      const updated = [...dateOptions];
+                      updated[idx] = e.target.value;
+                      setDateOptions(updated);
+                    }}
                     className="block w-full rounded-lg border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
                   />
                 </div>
