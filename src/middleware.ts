@@ -38,8 +38,8 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(loginUrl);
   }
 
-  // If user IS authenticated and tries to access the login page, redirect to dashboard
-  if (user && pathname.startsWith("/login")) {
+  // If user IS authenticated and on the landing or login page, redirect to dashboard
+  if (user && (pathname === "/" || pathname.startsWith("/login"))) {
     return NextResponse.redirect(new URL("/dashboard", request.url));
   }
 
