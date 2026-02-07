@@ -14,9 +14,18 @@ export async function GET(request: NextRequest) {
     throw new Error("NEXT_PUBLIC_APP_URL environment variable is required");
   }
 
+  console.log("[auth/confirm] Starting auth confirmation", {
+    hasTokenHash: !!token_hash,
+    hasCode: !!code,
+    type,
+    appUrl,
+    requestUrl: request.url,
+  });
+
   const redirectTo = new URL(next, appUrl);
 
   if (!token_hash && !code) {
+    console.log("[auth/confirm] No token_hash or code provided");
     redirectTo.pathname = "/login";
     redirectTo.searchParams.set("error", "Invalid login link");
     return NextResponse.redirect(redirectTo);
@@ -63,11 +72,17 @@ export async function GET(request: NextRequest) {
   }
 
   if (error || !data?.user) {
-    console.error("Auth confirm error:", error?.message);
+    console.error("[auth/confirm] Verification failed:", {
+      error: error?.message,
+      errorStatus: error?.status,
+      hasUser: !!data?.user,
+    });
     redirectTo.pathname = "/login";
     redirectTo.searchParams.set("error", error?.message || "Login link expired or invalid");
     return NextResponse.redirect(redirectTo);
   }
+
+  console.log("[auth/confirm] Verification succeeded for user:", data.user.email);
 
   // Link the Supabase auth user to the members table
   // This runs on every login to ensure the link is established

@@ -9,6 +9,7 @@ import {
   QUORUM_DEFAULT,
 } from "@/lib/constants";
 import { VoteTypeHelp } from "@/components/vote-type-help";
+import { RichTextEditor } from "@/components/rich-text-editor";
 import type { VoteFormat } from "@/lib/types";
 
 const initialState: ProposeVoteState = { error: null, fieldErrors: {} };
@@ -96,19 +97,13 @@ export function ProposeForm() {
 
       {/* Description */}
       <div>
-        <label
-          htmlFor="description"
-          className="block text-sm font-medium text-gray-700"
-        >
+        <label className="block text-sm font-medium text-gray-700">
           Description
         </label>
-        <textarea
-          id="description"
+        <RichTextEditor
           name="description"
-          rows={4}
           value={description}
-          onChange={(e) => setDescription(e.target.value)}
-          className="mt-1 block w-full rounded-lg border border-gray-300 px-3 py-2 shadow-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
+          onChange={setDescription}
           placeholder="Provide context so the group understands what they're voting on..."
         />
       </div>

@@ -10,6 +10,7 @@ import {
   PRIVACY_LEVEL_LABELS,
   PASSING_THRESHOLD_LABELS,
 } from "@/lib/constants";
+import { DescriptionDisplay } from "@/components/description-display";
 
 interface ProposalCardProps {
   proposal: {
@@ -90,7 +91,7 @@ export function ProposalCard({ proposal, readonly }: ProposalCardProps) {
       </div>
 
       {proposal.description && (
-        <p className="mt-3 text-sm text-gray-700">{proposal.description}</p>
+        <DescriptionDisplay content={proposal.description} className="mt-3 text-sm" />
       )}
 
       <div className="mt-4 grid grid-cols-2 gap-4 text-sm">

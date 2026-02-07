@@ -186,11 +186,13 @@ function getThresholdFraction(
 
 async function fetchBallots(
   voteId: string,
-  privacyLevel: string
+  privacyLevel: string,
+  votingMemberIds?: string[]
 ): Promise<{ choice: any }[]> {
   const adminClient = createAdminClient();
 
   if (privacyLevel === "anonymous") {
+    // Anonymous ballots can't be filtered by member — return all
     const { data, error } = await adminClient
       .from("ballot_records_anonymous")
       .select("choice")
@@ -199,10 +201,16 @@ async function fetchBallots(
     if (error) throw new Error(`Failed to fetch ballots: ${error.message}`);
     return data || [];
   } else {
-    const { data, error } = await adminClient
+    let query = adminClient
       .from("ballot_records_named")
       .select("choice")
       .eq("vote_id", voteId);
+
+    if (votingMemberIds) {
+      query = query.in("member_id", votingMemberIds);
+    }
+
+    const { data, error } = await query;
 
     if (error) throw new Error(`Failed to fetch ballots: ${error.message}`);
     return data || [];
@@ -216,9 +224,10 @@ async function fetchBallots(
 export async function tallyYesNo(
   vote: Vote,
   options: VoteOption[],
-  activeMemberCount: number
+  activeMemberCount: number,
+  votingMemberIds?: string[]
 ): Promise<YesNoResult> {
-  const ballots = await fetchBallots(vote.id, vote.privacy_level);
+  const ballots = await fetchBallots(vote.id, vote.privacy_level, votingMemberIds);
   const totalBallots = ballots.length;
 
   // Count per option
@@ -281,9 +290,10 @@ export async function tallyYesNo(
 export async function tallyMultipleChoice(
   vote: Vote,
   options: VoteOption[],
-  activeMemberCount: number
+  activeMemberCount: number,
+  votingMemberIds?: string[]
 ): Promise<MultipleChoiceResult> {
-  const ballots = await fetchBallots(vote.id, vote.privacy_level);
+  const ballots = await fetchBallots(vote.id, vote.privacy_level, votingMemberIds);
   const totalBallots = ballots.length;
 
   // Count per option
@@ -357,9 +367,10 @@ export async function tallyMultipleChoice(
 export async function tallyRankedChoice(
   vote: Vote,
   options: VoteOption[],
-  activeMemberCount: number
+  activeMemberCount: number,
+  votingMemberIds?: string[]
 ): Promise<RankedChoiceResult> {
-  const rawBallots = await fetchBallots(vote.id, vote.privacy_level);
+  const rawBallots = await fetchBallots(vote.id, vote.privacy_level, votingMemberIds);
   const totalBallots = rawBallots.length;
 
   // Parse each ballot's ranking into an ordered array of option IDs
@@ -532,9 +543,10 @@ export async function tallyRankedChoice(
 export async function tallyDatePoll(
   vote: Vote,
   options: VoteOption[],
-  activeMemberCount: number
+  activeMemberCount: number,
+  votingMemberIds?: string[]
 ): Promise<DatePollResult> {
-  const ballots = await fetchBallots(vote.id, vote.privacy_level);
+  const ballots = await fetchBallots(vote.id, vote.privacy_level, votingMemberIds);
   const totalBallots = ballots.length;
 
   // Build per-option yes/no/maybe counts
@@ -610,9 +622,10 @@ export async function tallyDatePoll(
 export async function tallyApproval(
   vote: Vote,
   options: VoteOption[],
-  activeMemberCount: number
+  activeMemberCount: number,
+  votingMemberIds?: string[]
 ): Promise<ApprovalResult> {
-  const ballots = await fetchBallots(vote.id, vote.privacy_level);
+  const ballots = await fetchBallots(vote.id, vote.privacy_level, votingMemberIds);
   const totalBallots = ballots.length;
 
   // Count approvals per option
@@ -676,9 +689,10 @@ export async function tallyApproval(
 export async function tallyRsvp(
   vote: Vote,
   options: VoteOption[],
-  activeMemberCount: number
+  activeMemberCount: number,
+  votingMemberIds?: string[]
 ): Promise<RsvpResult> {
-  const ballots = await fetchBallots(vote.id, vote.privacy_level);
+  const ballots = await fetchBallots(vote.id, vote.privacy_level, votingMemberIds);
   const totalBallots = ballots.length;
 
   let goingCount = 0;
@@ -733,9 +747,10 @@ export async function tallyRsvp(
 export async function tallyScoreRating(
   vote: Vote,
   options: VoteOption[],
-  activeMemberCount: number
+  activeMemberCount: number,
+  votingMemberIds?: string[]
 ): Promise<ScoreRatingResult> {
-  const ballots = await fetchBallots(vote.id, vote.privacy_level);
+  const ballots = await fetchBallots(vote.id, vote.privacy_level, votingMemberIds);
   const totalBallots = ballots.length;
 
   // Build per-option accumulators
@@ -832,9 +847,10 @@ export async function tallyScoreRating(
 export async function tallyMultiSelect(
   vote: Vote,
   options: VoteOption[],
-  activeMemberCount: number
+  activeMemberCount: number,
+  votingMemberIds?: string[]
 ): Promise<MultiSelectResult> {
-  const ballots = await fetchBallots(vote.id, vote.privacy_level);
+  const ballots = await fetchBallots(vote.id, vote.privacy_level, votingMemberIds);
   const totalBallots = ballots.length;
 
   // Count selections per option
@@ -901,25 +917,26 @@ export async function tallyMultiSelect(
 export async function tallyVote(
   vote: Vote,
   options: VoteOption[],
-  activeMemberCount: number
+  activeMemberCount: number,
+  votingMemberIds?: string[]
 ): Promise<VoteResult> {
   switch (vote.format) {
     case "yes_no":
-      return tallyYesNo(vote, options, activeMemberCount);
+      return tallyYesNo(vote, options, activeMemberCount, votingMemberIds);
     case "multiple_choice":
-      return tallyMultipleChoice(vote, options, activeMemberCount);
+      return tallyMultipleChoice(vote, options, activeMemberCount, votingMemberIds);
     case "ranked_choice":
-      return tallyRankedChoice(vote, options, activeMemberCount);
+      return tallyRankedChoice(vote, options, activeMemberCount, votingMemberIds);
     case "date_poll":
-      return tallyDatePoll(vote, options, activeMemberCount);
+      return tallyDatePoll(vote, options, activeMemberCount, votingMemberIds);
     case "approval":
-      return tallyApproval(vote, options, activeMemberCount);
+      return tallyApproval(vote, options, activeMemberCount, votingMemberIds);
     case "rsvp":
-      return tallyRsvp(vote, options, activeMemberCount);
+      return tallyRsvp(vote, options, activeMemberCount, votingMemberIds);
     case "score_rating":
-      return tallyScoreRating(vote, options, activeMemberCount);
+      return tallyScoreRating(vote, options, activeMemberCount, votingMemberIds);
     case "multi_select":
-      return tallyMultiSelect(vote, options, activeMemberCount);
+      return tallyMultiSelect(vote, options, activeMemberCount, votingMemberIds);
     default:
       throw new Error(`Unsupported vote format: ${vote.format}`);
   }

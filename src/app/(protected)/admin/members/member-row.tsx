@@ -1,7 +1,7 @@
 "use client";
 
 import { useTransition } from "react";
-import { toggleMemberActive, toggleMemberRole, removeMember } from "./actions";
+import { toggleMemberActive, toggleMemberRole, toggleVotingMember, removeMember } from "./actions";
 import type { Member } from "@/lib/types";
 
 export function MemberRow({ member }: { member: Member }) {
@@ -23,6 +23,12 @@ export function MemberRow({ member }: { member: Member }) {
       return;
     startTransition(() => {
       toggleMemberRole(member.id, newRole);
+    });
+  }
+
+  function handleToggleVoting() {
+    startTransition(() => {
+      toggleVotingMember(member.id, !member.voting_member);
     });
   }
 
@@ -62,6 +68,23 @@ export function MemberRow({ member }: { member: Member }) {
         >
           {member.active ? "Active" : "Inactive"}
         </span>
+      </td>
+      <td className="whitespace-nowrap px-4 py-3 text-sm">
+        <button
+          onClick={handleToggleVoting}
+          disabled={isPending}
+          className="inline-flex items-center gap-1.5 disabled:opacity-50"
+        >
+          <span
+            className={
+              member.voting_member
+                ? "inline-flex rounded-full bg-blue-100 px-2 py-0.5 text-xs font-medium text-blue-800"
+                : "inline-flex rounded-full bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-500"
+            }
+          >
+            {member.voting_member ? "Shareholder" : "Non-voting"}
+          </span>
+        </button>
       </td>
       <td className="whitespace-nowrap px-4 py-3 text-right text-sm">
         <button

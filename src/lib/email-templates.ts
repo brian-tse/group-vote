@@ -67,6 +67,30 @@ export function resultsPublishedEmail(
 }
 
 /**
+ * Proposal submitted email -- sent to admins when a member proposes a vote.
+ */
+export function proposalSubmittedEmail(
+  proposalTitle: string,
+  proposerName: string,
+  format: string
+) {
+  const reviewUrl = `${APP_URL}/admin/proposals`;
+
+  return {
+    subject: `New proposal: ${proposalTitle}`,
+    bodyHtml: `
+      <h2>New Vote Proposal</h2>
+      <p><strong>${proposerName}</strong> has submitted a new proposal:</p>
+      <p style="font-size: 16px; font-weight: 600; margin: 16px 0;">${proposalTitle}</p>
+      <p>Format: ${format}</p>
+      <p style="text-align: center; margin: 24px 0;">
+        <a href="${reviewUrl}" class="btn">Review Proposals</a>
+      </p>
+    `,
+  };
+}
+
+/**
  * Reminder email -- sent to non-voters for an open vote.
  */
 export function reminderEmail(

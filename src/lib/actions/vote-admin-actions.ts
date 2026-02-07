@@ -4,17 +4,18 @@ import { requireAdmin } from "@/lib/auth";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
+import { notifyVoteOpened, notifyResultsPublished } from "./notification-actions";
 
 /**
  * Open a vote — changes status from draft to open and records the opened_at timestamp.
  */
-export async function openVote(voteId: string): Promise<void> {
+export async function openVote(voteId: string, notify: boolean = true): Promise<void> {
   await requireAdmin();
   const adminClient = createAdminClient();
 
   const { data: vote, error: fetchError } = await adminClient
     .from("votes")
-    .select("id, status")
+    .select("id, status, title, deadline")
     .eq("id", voteId)
     .single();
 
@@ -38,6 +39,13 @@ export async function openVote(voteId: string): Promise<void> {
     throw new Error(`Failed to open vote: ${error.message}`);
   }
 
+  // Notify all active members (if requested)
+  if (notify) {
+    await notifyVoteOpened(voteId, vote.title, vote.deadline).catch((err) =>
+      console.error("Failed to send vote opened notifications:", err)
+    );
+  }
+
   revalidatePath(`/votes/${voteId}`);
   revalidatePath("/admin/votes");
   revalidatePath("/dashboard");
@@ -46,13 +54,13 @@ export async function openVote(voteId: string): Promise<void> {
 /**
  * Manually close a vote — changes status from open to closed.
  */
-export async function closeVote(voteId: string): Promise<void> {
+export async function closeVote(voteId: string, notify: boolean = true): Promise<void> {
   await requireAdmin();
   const adminClient = createAdminClient();
 
   const { data: vote, error: fetchError } = await adminClient
     .from("votes")
-    .select("id, status")
+    .select("id, status, title")
     .eq("id", voteId)
     .single();
 
@@ -74,6 +82,17 @@ export async function closeVote(voteId: string): Promise<void> {
 
   if (error) {
     throw new Error(`Failed to close vote: ${error.message}`);
+  }
+
+  // Notify all active members that results are available (if requested)
+  if (notify) {
+    await notifyResultsPublished(
+      voteId,
+      vote.title,
+      "The vote has been closed and results are now available."
+    ).catch((err) =>
+      console.error("Failed to send results published notifications:", err)
+    );
   }
 
   revalidatePath(`/votes/${voteId}`);

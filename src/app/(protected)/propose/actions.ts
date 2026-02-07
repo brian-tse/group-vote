@@ -3,6 +3,9 @@
 import { getCurrentMember } from "@/lib/auth";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { redirect } from "next/navigation";
+import { sendBulkEmail } from "@/lib/email";
+import { proposalSubmittedEmail } from "@/lib/email-templates";
+import { VOTE_FORMAT_LABELS } from "@/lib/constants";
 import type { VoteFormat, PrivacyLevel, PassingThreshold } from "@/lib/types";
 
 export interface ProposeVoteState {
@@ -157,6 +160,24 @@ export async function proposeVote(
       error: `Failed to submit proposal: ${error.message}`,
       fieldErrors: {},
     };
+  }
+
+  // Notify admins of the new proposal (must await before redirect)
+  const { data: admins } = await adminClient
+    .from("members")
+    .select("email")
+    .eq("role", "admin")
+    .eq("active", true);
+
+  if (admins && admins.length > 0) {
+    const proposerName = member.name || member.email;
+    const formatLabel = VOTE_FORMAT_LABELS[format] || format;
+    const { subject, bodyHtml } = proposalSubmittedEmail(title, proposerName, formatLabel);
+    await sendBulkEmail(
+      admins.map((a) => a.email),
+      subject,
+      bodyHtml
+    ).catch((err) => console.error("Failed to notify admins of proposal:", err));
   }
 
   redirect("/dashboard");

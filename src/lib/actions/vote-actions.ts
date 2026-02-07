@@ -16,6 +16,8 @@ export type VoteChoice =
   | { scores: Record<string, number> }     // score_rating
   | { selected: string[] };         // multi_select
 
+export type VoteActionResult = { error?: string };
+
 interface CastVoteInput {
   voteId: string;
   choice: VoteChoice;
@@ -26,20 +28,7 @@ interface ChangeVoteInput extends CastVoteInput {
   sessionToken: string | null;
 }
 
-/**
- * Cast a vote for the first time.
- *
- * Anonymous votes:
- *   1. Insert a participation record (member_id + vote_id) — tracks WHO voted
- *   2. Insert a ballot record (vote_id + choice, NO member_id) — tracks the CHOICE
- *   3. Store a temporary session token in a cookie so the member can change
- *      their anonymous ballot later (the cookie maps to the ballot row id)
- *
- * Non-anonymous votes:
- *   1. Insert a single ballot_records_named row with member_id + choice
- *   2. Insert a participation record for consistency
- */
-export async function castVote(input: CastVoteInput): Promise<void> {
+export async function castVote(input: CastVoteInput): Promise<VoteActionResult> {
   const member = await getCurrentMember();
   const adminClient = createAdminClient();
 
@@ -51,11 +40,11 @@ export async function castVote(input: CastVoteInput): Promise<void> {
     .single();
 
   if (voteError || !vote) {
-    throw new Error("Vote not found.");
+    return { error: "Vote not found." };
   }
 
   if (vote.status !== "open") {
-    throw new Error("This vote is not currently open.");
+    return { error: "This vote is not currently open." };
   }
 
   // Check member hasn't already voted
@@ -67,9 +56,7 @@ export async function castVote(input: CastVoteInput): Promise<void> {
     .single();
 
   if (existing) {
-    throw new Error(
-      "You have already voted. Use the change vote option instead."
-    );
+    return { error: "You have already voted. Use the change vote option instead." };
   }
 
   if (input.privacyLevel === "anonymous") {
@@ -84,7 +71,7 @@ export async function castVote(input: CastVoteInput): Promise<void> {
       });
 
     if (partError) {
-      throw new Error(`Failed to record participation: ${partError.message}`);
+      return { error: `Failed to record participation: ${partError.message}` };
     }
 
     // 2. Insert anonymous ballot (WHAT was chosen — no member info)
@@ -104,12 +91,10 @@ export async function castVote(input: CastVoteInput): Promise<void> {
         .delete()
         .eq("vote_id", input.voteId)
         .eq("member_id", member.id);
-      throw new Error(`Failed to cast ballot: ${ballotError.message}`);
+      return { error: `Failed to cast ballot: ${ballotError.message}` };
     }
 
     // 3. Store ballot ID in a cookie so the member can change their vote later.
-    //    This is the ONLY link between the member and the anonymous ballot,
-    //    and it exists only in the member's browser session.
     const cookieStore = await cookies();
     cookieStore.set(
       `ballot_token_${input.voteId}`,
@@ -135,7 +120,7 @@ export async function castVote(input: CastVoteInput): Promise<void> {
       });
 
     if (ballotError) {
-      throw new Error(`Failed to cast ballot: ${ballotError.message}`);
+      return { error: `Failed to cast ballot: ${ballotError.message}` };
     }
 
     // 2. Insert participation record
@@ -155,23 +140,10 @@ export async function castVote(input: CastVoteInput): Promise<void> {
   }
 
   revalidatePath(`/votes/${input.voteId}`);
+  return {};
 }
 
-/**
- * Change an existing vote.
- *
- * Anonymous votes:
- *   - Use the session token (cookie) to find the old ballot row
- *   - Delete the old anonymous ballot
- *   - Insert a new anonymous ballot with the new choice
- *   - Update the cookie with the new ballot ID
- *   - Update the participation record's updated_at timestamp
- *
- * Non-anonymous votes:
- *   - Update the existing ballot_records_named row in place
- *   - Update the participation record's updated_at timestamp
- */
-export async function changeVote(input: ChangeVoteInput): Promise<void> {
+export async function changeVote(input: ChangeVoteInput): Promise<VoteActionResult> {
   const member = await getCurrentMember();
   const adminClient = createAdminClient();
 
@@ -183,11 +155,11 @@ export async function changeVote(input: ChangeVoteInput): Promise<void> {
     .single();
 
   if (voteError || !vote) {
-    throw new Error("Vote not found.");
+    return { error: "Vote not found." };
   }
 
   if (vote.status !== "open") {
-    throw new Error("This vote is closed — you can no longer change your vote.");
+    return { error: "This vote is closed — you can no longer change your vote." };
   }
 
   if (input.privacyLevel === "anonymous") {
@@ -198,10 +170,11 @@ export async function changeVote(input: ChangeVoteInput): Promise<void> {
     const ballotId = cookieStore.get(`ballot_token_${input.voteId}`)?.value;
 
     if (!ballotId) {
-      throw new Error(
-        "Unable to identify your previous anonymous ballot. " +
-        "This can happen if you cleared your cookies or are using a different browser."
-      );
+      return {
+        error:
+          "Unable to identify your previous anonymous ballot. " +
+          "This can happen if you cleared your cookies or are using a different browser.",
+      };
     }
 
     // Verify the old ballot exists
@@ -213,9 +186,7 @@ export async function changeVote(input: ChangeVoteInput): Promise<void> {
       .single();
 
     if (!oldBallot) {
-      throw new Error(
-        "Previous ballot not found. It may have already been removed."
-      );
+      return { error: "Previous ballot not found. It may have already been removed." };
     }
 
     // Delete the old anonymous ballot
@@ -225,7 +196,7 @@ export async function changeVote(input: ChangeVoteInput): Promise<void> {
       .eq("id", ballotId);
 
     if (deleteError) {
-      throw new Error(`Failed to remove old ballot: ${deleteError.message}`);
+      return { error: `Failed to remove old ballot: ${deleteError.message}` };
     }
 
     // Insert new anonymous ballot
@@ -239,7 +210,7 @@ export async function changeVote(input: ChangeVoteInput): Promise<void> {
       .single();
 
     if (insertError) {
-      throw new Error(`Failed to cast new ballot: ${insertError.message}`);
+      return { error: `Failed to cast new ballot: ${insertError.message}` };
     }
 
     // Update the cookie with the new ballot ID
@@ -274,7 +245,7 @@ export async function changeVote(input: ChangeVoteInput): Promise<void> {
       .eq("member_id", member.id);
 
     if (updateError) {
-      throw new Error(`Failed to update vote: ${updateError.message}`);
+      return { error: `Failed to update vote: ${updateError.message}` };
     }
 
     // Update participation timestamp
@@ -286,4 +257,5 @@ export async function changeVote(input: ChangeVoteInput): Promise<void> {
   }
 
   revalidatePath(`/votes/${input.voteId}`);
+  return {};
 }

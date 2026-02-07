@@ -14,7 +14,7 @@ function getResendClient(): Resend {
   return resendClient;
 }
 
-const FROM_ADDRESS = "ACAMG Voting <noreply@acamedicalgroup.com>";
+const FROM_ADDRESS = "ACAMG Voting <noreply@acamgvote.com>";
 
 /**
  * Base email layout that wraps all transactional emails.

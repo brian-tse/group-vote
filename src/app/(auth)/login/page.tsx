@@ -1,15 +1,21 @@
 "use client";
 
 import { useActionState } from "react";
+import { useSearchParams } from "next/navigation";
+import { Suspense } from "react";
 import { loginWithMagicLink, type LoginState } from "./actions";
 
 const initialState: LoginState = { error: null, success: false };
 
-export default function LoginPage() {
+function LoginForm() {
   const [state, formAction, isPending] = useActionState(
     loginWithMagicLink,
     initialState
   );
+  const searchParams = useSearchParams();
+  const urlError = searchParams.get("error");
+
+  const displayError = urlError || state.error;
 
   return (
     <main className="flex min-h-screen flex-col bg-gray-50">
@@ -43,9 +49,9 @@ export default function LoginPage() {
             </div>
           ) : (
             <form action={formAction} className="space-y-6">
-              {state.error && (
+              {displayError && (
                 <div className="rounded-lg bg-red-50 p-4 text-sm text-red-700">
-                  {state.error}
+                  {displayError}
                 </div>
               )}
 
@@ -79,5 +85,13 @@ export default function LoginPage() {
         </div>
       </div>
     </main>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense>
+      <LoginForm />
+    </Suspense>
   );
 }

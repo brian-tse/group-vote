@@ -99,6 +99,22 @@ export async function toggleMemberRole(memberId: string, role: "admin" | "member
   revalidatePath("/admin/members");
 }
 
+export async function toggleVotingMember(memberId: string, votingMember: boolean) {
+  await requireAdmin();
+
+  const adminClient = createAdminClient();
+  const { error } = await adminClient
+    .from("members")
+    .update({ voting_member: votingMember })
+    .eq("id", memberId);
+
+  if (error) {
+    throw new Error(`Failed to update voting status: ${error.message}`);
+  }
+
+  revalidatePath("/admin/members");
+}
+
 export async function removeMember(memberId: string) {
   await requireAdmin();
 

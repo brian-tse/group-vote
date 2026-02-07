@@ -17,6 +17,7 @@ export default async function AdminMembersPage() {
   }
 
   const activeCount = members.filter((m) => m.active).length;
+  const votingCount = members.filter((m) => m.active && m.voting_member).length;
 
   return (
     <div className="space-y-6">
@@ -24,7 +25,7 @@ export default async function AdminMembersPage() {
         <h1 className="text-2xl font-bold text-gray-900">Manage Members</h1>
         <p className="mt-1 text-sm text-gray-500">
           {activeCount} active member{activeCount !== 1 ? "s" : ""} of{" "}
-          {members.length} total
+          {members.length} total ({votingCount} voting shareholder{votingCount !== 1 ? "s" : ""})
         </p>
       </div>
 
@@ -45,6 +46,9 @@ export default async function AdminMembersPage() {
               </th>
               <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
                 Status
+              </th>
+              <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
+                Voting
               </th>
               <th className="px-4 py-3 text-right text-xs font-medium uppercase tracking-wider text-gray-500">
                 Actions
