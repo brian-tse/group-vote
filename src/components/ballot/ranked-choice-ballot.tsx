@@ -19,10 +19,10 @@ import {
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import type { VoteOption } from "@/lib/types";
+import type { BallotOption } from "@/lib/types";
 
 interface RankedChoiceBallotProps {
-  options: VoteOption[];
+  options: BallotOption[];
   currentRanking: string[] | null;
   onVote: (rankedOptionIds: string[]) => void;
   disabled: boolean;
@@ -32,7 +32,7 @@ function SortableItem({
   option,
   rank,
 }: {
-  option: VoteOption;
+  option: BallotOption;
   rank: number;
 }) {
   const {
@@ -105,9 +105,7 @@ export function RankedChoiceBallot({
     if (currentRanking && currentRanking.length === options.length) {
       return currentRanking;
     }
-    return [...options]
-      .sort((a, b) => a.display_order - b.display_order)
-      .map((o) => o.id);
+    return options.map((o) => o.id);
   });
 
   const sensors = useSensors(

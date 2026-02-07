@@ -63,27 +63,45 @@ export default async function ResultsPage({
     );
   }
 
-  // Fetch options
-  const { data: options } = await adminClient
-    .from("vote_options")
-    .select("*")
-    .eq("vote_id", id)
-    .order("display_order", { ascending: true });
+  // Fetch options and member counts in parallel
+  const [{ data: options }, { count: activeMemberCount }, { data: votingMembers }] =
+    await Promise.all([
+      adminClient
+        .from("vote_options")
+        .select("*")
+        .eq("vote_id", id)
+        .order("display_order", { ascending: true }),
+      adminClient
+        .from("members")
+        .select("*", { count: "exact", head: true })
+        .eq("active", true),
+      adminClient
+        .from("members")
+        .select("id")
+        .eq("active", true)
+        .eq("voting_member", true),
+    ]);
 
   const typedOptions = (options || []) as VoteOption[];
 
-  // Get active member count at close time
-  const { count: activeMemberCount } = await adminClient
-    .from("members")
-    .select("*", { count: "exact", head: true })
-    .eq("active", true);
+  const votingMemberIds = (votingMembers || []).map((m: { id: string }) => m.id);
+  const votingMemberCount = votingMemberIds.length;
+  const hasNonVotingMembers = votingMemberCount < (activeMemberCount || 0);
+  const isAnonymous = typedVote.privacy_level === "anonymous";
 
-  // Tally the vote
+  // Official tally: voting shareholders only (quorum based on voting members)
+  // For anonymous votes, we can't filter ballots by member, so official = all
   const result = await tallyVote(
     typedVote,
     typedOptions,
-    activeMemberCount || 0
+    votingMemberCount,
+    isAnonymous ? undefined : votingMemberIds
   );
+
+  // All-members tally (only needed if there are non-voting members and it's not anonymous)
+  const allMembersResult = hasNonVotingMembers && !isAnonymous
+    ? await tallyVote(typedVote, typedOptions, activeMemberCount || 0)
+    : null;
 
   const status = getResultStatus(result);
   const explanation = getResultExplanation(result);
@@ -127,6 +145,13 @@ export default async function ResultsPage({
           )}
         </div>
         <p className="mt-2 text-sm text-gray-600">{explanation}</p>
+        {hasNonVotingMembers && (
+          <p className="mt-2 text-xs text-gray-400">
+            {isAnonymous
+              ? "This is an anonymous vote — ballots cannot be separated by voting status."
+              : `Official tally based on ${votingMemberCount} voting shareholder${votingMemberCount !== 1 ? "s" : ""}.`}
+          </p>
+        )}
       </div>
 
       {/* Quorum and threshold badges */}
@@ -633,6 +658,60 @@ export default async function ResultsPage({
           </div>
         );
       })()}
+
+      {/* All Members tally — shown when there are non-voting members and vote is not anonymous */}
+      {allMembersResult && (
+        <div className="rounded-lg border border-dashed border-gray-300 bg-gray-50 p-6">
+          <h2 className="text-lg font-semibold text-gray-700">
+            All Members (Including Non-Voting)
+          </h2>
+          <p className="mt-1 text-sm text-gray-500">
+            {allMembersResult.totalBallots} ballot{allMembersResult.totalBallots !== 1 ? "s" : ""} cast
+            (vs. {result.totalBallots} from voting shareholders)
+          </p>
+
+          <div className="mt-3 flex gap-4">
+            <div className="flex-1 rounded-lg border bg-white p-3">
+              <div className="text-xs font-medium text-gray-500">Quorum (all members)</div>
+              <div className="mt-1 text-lg font-bold">{allMembersResult.quorumActual}%</div>
+            </div>
+            {allMembersResult.winner && (
+              <div className="flex-1 rounded-lg border bg-white p-3">
+                <div className="text-xs font-medium text-gray-500">Top choice</div>
+                <div className="mt-1 text-lg font-bold">{allMembersResult.winner.label}</div>
+              </div>
+            )}
+          </div>
+
+          {/* Simple bar chart for formats with counts */}
+          {"counts" in allMembersResult && Array.isArray(allMembersResult.counts) && (
+            <div className="mt-4 space-y-2">
+              {(allMembersResult.counts as { optionId: string; label: string; count: number }[]).map((item) => {
+                const percentage =
+                  allMembersResult.totalBallots > 0
+                    ? Math.round((item.count / allMembersResult.totalBallots) * 100)
+                    : 0;
+                return (
+                  <div key={item.optionId}>
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="text-gray-600">{item.label}</span>
+                      <span className="text-gray-400">
+                        {item.count} ({percentage}%)
+                      </span>
+                    </div>
+                    <div className="mt-1 h-3 w-full overflow-hidden rounded-full bg-gray-200">
+                      <div
+                        className="h-full rounded-full bg-gray-400"
+                        style={{ width: `${percentage}%` }}
+                      />
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }

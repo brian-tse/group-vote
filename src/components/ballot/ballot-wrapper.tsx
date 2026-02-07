@@ -1,24 +1,41 @@
 // src/components/ballot/ballot-wrapper.tsx
 "use client";
 
-import { useTransition, useState, useCallback } from "react";
+import { useTransition, useState, useCallback, useEffect } from "react";
 import { castVote, changeVote } from "@/lib/actions/vote-actions";
 import type { VoteChoice } from "@/lib/actions/vote-actions";
 import { YesNoBallot } from "./yes-no-ballot";
 import { MultipleChoiceBallot } from "./multiple-choice-ballot";
-import { RankedChoiceBallot } from "./ranked-choice-ballot";
 import { DatePollBallot } from "./date-poll-ballot";
 import { ApprovalBallot } from "./approval-ballot";
 import { RsvpBallot } from "./rsvp-ballot";
 import { ScoreRatingBallot } from "./score-rating-ballot";
 import { MultiSelectBallot } from "./multi-select-ballot";
-import type { VoteOption, VoteFormat, PrivacyLevel } from "@/lib/types";
+import type { BallotOption, VoteFormat, PrivacyLevel } from "@/lib/types";
+
+// @dnd-kit uses browser-only APIs — lazy load only on the client
+type RankedChoiceBallotProps = {
+  options: BallotOption[];
+  currentRanking: string[] | null;
+  onVote: (rankedOptionIds: string[]) => void;
+  disabled: boolean;
+};
+function LazyRankedChoiceBallot(props: RankedChoiceBallotProps) {
+  const [Component, setComponent] = useState<React.ComponentType<RankedChoiceBallotProps> | null>(null);
+  useEffect(() => {
+    import("./ranked-choice-ballot").then((m) => {
+      setComponent(() => m.RankedChoiceBallot);
+    });
+  }, []);
+  if (!Component) return <p className="text-sm text-gray-400">Loading ranked choice ballot...</p>;
+  return <Component {...props} />;
+}
 
 interface BallotWrapperProps {
   voteId: string;
   format: VoteFormat;
   privacyLevel: PrivacyLevel;
-  options: VoteOption[];
+  options: BallotOption[];
   existingChoice: string | null;
   existingRanking: string[] | null;
   existingResponses: Record<string, string> | null;
@@ -114,19 +131,25 @@ export function BallotWrapper({
             throw new Error("Unrecognized choice format");
           }
 
+          let result;
           if (hasVoted) {
-            await changeVote({
+            result = await changeVote({
               voteId,
               choice: choicePayload,
               privacyLevel,
               sessionToken,
             });
           } else {
-            await castVote({
+            result = await castVote({
               voteId,
               choice: choicePayload,
               privacyLevel,
             });
+          }
+
+          if (result?.error) {
+            setError(result.error);
+            return;
           }
 
           // Update local state based on discriminated type
@@ -196,7 +219,7 @@ export function BallotWrapper({
       )}
 
       {format === "ranked_choice" && (
-        <RankedChoiceBallot
+        <LazyRankedChoiceBallot
           options={options}
           currentRanking={currentRanking}
           onVote={(rankedIds) => handleVote(rankedIds)}

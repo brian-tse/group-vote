@@ -105,59 +105,64 @@ export async function GET(request: Request) {
     )
   );
 
-  const details: {
-    voteId: string;
-    voteTitle: string;
-    reminderType: string;
-    sent: number;
-  }[] = [];
+  // Process all votes in parallel
+  const allDetails = await Promise.all(
+    openVotes.map(async (vote) => {
+      const deadline = new Date(vote.deadline);
+      const openedAt = new Date(vote.opened_at);
+      const voteDetails: {
+        voteId: string;
+        voteTitle: string;
+        reminderType: string;
+        sent: number;
+      }[] = [];
 
-  for (const vote of openVotes) {
-    const deadline = new Date(vote.deadline);
-    const openedAt = new Date(vote.opened_at);
+      // Skip if deadline has already passed (close-votes cron handles that)
+      if (deadline <= now) return voteDetails;
 
-    // Skip if deadline has already passed (close-votes cron handles that)
-    if (deadline <= now) continue;
+      for (const check of REMINDER_CHECKS) {
+        const key = `${vote.id}:${check.type}`;
 
-    for (const check of REMINDER_CHECKS) {
-      const key = `${vote.id}:${check.type}`;
+        // Skip if already sent
+        if (sentSet.has(key)) continue;
 
-      // Skip if already sent
-      if (sentSet.has(key)) continue;
+        // Check if this reminder window is active
+        if (!check.shouldSend(openedAt, deadline, now)) continue;
 
-      // Check if this reminder window is active
-      if (!check.shouldSend(openedAt, deadline, now)) continue;
+        // Send the reminder to non-voters
+        try {
+          const result = await sendReminderToNonVoters(
+            vote.id,
+            vote.title,
+            vote.deadline,
+            check.type
+          );
 
-      // Send the reminder to non-voters
-      try {
-        const result = await sendReminderToNonVoters(
-          vote.id,
-          vote.title,
-          vote.deadline,
-          check.type
-        );
+          // Record that this reminder was sent
+          await adminClient.from("sent_reminders").insert({
+            vote_id: vote.id,
+            type: check.type,
+          });
 
-        // Record that this reminder was sent
-        await adminClient.from("sent_reminders").insert({
-          vote_id: vote.id,
-          type: check.type,
-        });
-
-        details.push({
-          voteId: vote.id,
-          voteTitle: vote.title,
-          reminderType: check.type,
-          sent: result.sent,
-        });
-      } catch (err) {
-        console.error(
-          `Failed to send ${check.type} reminder for vote "${vote.title}":`,
-          err instanceof Error ? err.message : err
-        );
+          voteDetails.push({
+            voteId: vote.id,
+            voteTitle: vote.title,
+            reminderType: check.type,
+            sent: result.sent,
+          });
+        } catch (err) {
+          console.error(
+            `Failed to send ${check.type} reminder for vote "${vote.title}":`,
+            err instanceof Error ? err.message : err
+          );
+        }
       }
-    }
-  }
 
+      return voteDetails;
+    })
+  );
+
+  const details = allDetails.flat();
   const totalSent = details.reduce((sum, d) => sum + d.sent, 0);
 
   return NextResponse.json({

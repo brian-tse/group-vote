@@ -28,6 +28,7 @@ export interface Member {
   name: string | null;
   role: MemberRole;
   active: boolean;
+  voting_member: boolean;
   created_at: string;
 }
 
@@ -54,6 +55,9 @@ export interface VoteOption {
   description: string | null;
   display_order: number;
 }
+
+/** Slim version of VoteOption for client-side ballot components */
+export type BallotOption = Pick<VoteOption, "id" | "label" | "description">;
 
 export interface ParticipationRecord {
   id: string;

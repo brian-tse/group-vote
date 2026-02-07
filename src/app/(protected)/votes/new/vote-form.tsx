@@ -1,6 +1,7 @@
 "use client";
 
 import { useActionState, useState } from "react";
+import dynamic from "next/dynamic";
 import { createVote, type CreateVoteState } from "./actions";
 import {
   VOTE_FORMAT_LABELS,
@@ -10,6 +11,20 @@ import {
 } from "@/lib/constants";
 import type { VoteFormat } from "@/lib/types";
 import { VoteTypeHelp } from "@/components/vote-type-help";
+
+const RichTextEditor = dynamic(
+  () => import("@/components/rich-text-editor").then((m) => m.RichTextEditor),
+  {
+    loading: () => (
+      <div className="mt-1 rounded-lg border border-gray-300 bg-white shadow-sm">
+        <div className="min-h-[120px] px-3 py-2 text-sm text-gray-400">
+          Loading editor...
+        </div>
+      </div>
+    ),
+    ssr: false,
+  }
+);
 
 const initialState: CreateVoteState = { error: null, fieldErrors: {} };
 
@@ -87,16 +102,13 @@ export function VoteForm() {
       </div>
 
       <div>
-        <label htmlFor="description" className="block text-sm font-medium text-gray-700">
+        <label className="block text-sm font-medium text-gray-700">
           Description
         </label>
-        <textarea
-          id="description"
+        <RichTextEditor
           name="description"
-          rows={3}
           value={description}
-          onChange={(e) => setDescription(e.target.value)}
-          className="mt-1 block w-full rounded-lg border border-gray-300 px-3 py-2 shadow-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
+          onChange={setDescription}
           placeholder="Provide context for voters..."
         />
       </div>

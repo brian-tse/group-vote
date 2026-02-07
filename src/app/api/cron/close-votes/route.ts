@@ -43,25 +43,28 @@ export async function GET(request: Request) {
     return NextResponse.json({ closed: 0 });
   }
 
-  // Close each expired vote
-  const closedIds: string[] = [];
-  for (const vote of expiredVotes) {
-    const { error: updateError } = await adminClient
-      .from("votes")
-      .update({
-        status: "closed",
-        closed_at: now,
-      })
-      .eq("id", vote.id);
+  // Close all expired votes in parallel
+  const results = await Promise.all(
+    expiredVotes.map(async (vote) => {
+      const { error: updateError } = await adminClient
+        .from("votes")
+        .update({
+          status: "closed",
+          closed_at: now,
+        })
+        .eq("id", vote.id);
 
-    if (updateError) {
-      console.error(
-        `Failed to close vote "${vote.title}": ${updateError.message}`
-      );
-    } else {
-      closedIds.push(vote.id);
-    }
-  }
+      if (updateError) {
+        console.error(
+          `Failed to close vote "${vote.title}": ${updateError.message}`
+        );
+        return null;
+      }
+      return vote.id;
+    })
+  );
+
+  const closedIds = results.filter((id): id is string => id !== null);
 
   return NextResponse.json({
     closed: closedIds.length,

@@ -2,10 +2,10 @@
 "use client";
 
 import { useState } from "react";
-import type { VoteOption } from "@/lib/types";
+import type { BallotOption } from "@/lib/types";
 
 interface ScoreRatingBallotProps {
-  options: VoteOption[];
+  options: BallotOption[];
   currentScores: Record<string, number> | null;
   onVote: (scores: Record<string, number>) => void;
   disabled: boolean;
@@ -21,11 +21,7 @@ export function ScoreRatingBallot({
     () => currentScores ?? {}
   );
 
-  const sortedOptions = [...options].sort(
-    (a, b) => a.display_order - b.display_order
-  );
-
-  const allRated = sortedOptions.every((opt) => scores[opt.id] != null);
+  const allRated = options.every((opt) => scores[opt.id] != null);
 
   const hasChanged =
     currentScores &&
@@ -42,7 +38,7 @@ export function ScoreRatingBallot({
       </p>
 
       <div className="space-y-3">
-        {sortedOptions.map((option) => (
+        {options.map((option) => (
           <div
             key={option.id}
             className="rounded-lg border-2 border-gray-200 bg-white px-4 py-3"

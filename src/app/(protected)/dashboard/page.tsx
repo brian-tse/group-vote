@@ -7,23 +7,22 @@ export default async function DashboardPage() {
   const member = await getCurrentMember();
   const adminClient = createAdminClient();
 
-  // Fetch open votes
-  const { data: openVotes } = await adminClient
-    .from("votes")
-    .select("*")
-    .eq("status", "open")
-    .order("created_at", { ascending: false });
+  // Fetch open votes and recent results in parallel
+  const [{ data: openVotes }, { data: recentResults }] = await Promise.all([
+    adminClient
+      .from("votes")
+      .select("*")
+      .eq("status", "open")
+      .order("created_at", { ascending: false }),
+    adminClient
+      .from("votes")
+      .select("*")
+      .eq("status", "closed")
+      .order("closed_at", { ascending: false })
+      .limit(10),
+  ]);
 
   const typedOpenVotes = (openVotes || []) as Vote[];
-
-  // Fetch recently closed votes (last 10)
-  const { data: recentResults } = await adminClient
-    .from("votes")
-    .select("*")
-    .eq("status", "closed")
-    .order("closed_at", { ascending: false })
-    .limit(10);
-
   const typedRecentResults = (recentResults || []) as Vote[];
 
   // Check which open votes the member has already voted on
@@ -154,7 +153,7 @@ export default async function DashboardPage() {
           Propose a Vote
         </a>
         <a
-          href="/history"
+          href="/votes"
           className="rounded-lg border border-brand-300 px-4 py-2 text-sm font-medium text-brand-700 hover:bg-brand-50"
         >
           My Voting History

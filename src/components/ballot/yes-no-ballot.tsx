@@ -1,10 +1,10 @@
 // src/components/ballot/yes-no-ballot.tsx
 "use client";
 
-import type { VoteOption } from "@/lib/types";
+import type { BallotOption } from "@/lib/types";
 
 interface YesNoBallotProps {
-  options: VoteOption[];
+  options: BallotOption[];
   currentChoice: string | null;
   onVote: (optionId: string) => void;
   disabled: boolean;

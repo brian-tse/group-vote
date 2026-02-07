@@ -2,10 +2,10 @@
 "use client";
 
 import { useState } from "react";
-import type { VoteOption } from "@/lib/types";
+import type { BallotOption } from "@/lib/types";
 
 interface MultiSelectBallotProps {
-  options: VoteOption[];
+  options: BallotOption[];
   maxSelections: number;
   currentSelected: string[] | null;
   onVote: (selected: string[]) => void;
@@ -21,10 +21,6 @@ export function MultiSelectBallot({
 }: MultiSelectBallotProps) {
   const [selected, setSelected] = useState<string[]>(
     () => currentSelected ?? []
-  );
-
-  const sortedOptions = [...options].sort(
-    (a, b) => a.display_order - b.display_order
   );
 
   const atMax = selected.length >= maxSelections;
@@ -62,7 +58,7 @@ export function MultiSelectBallot({
       </div>
 
       <div className="space-y-2">
-        {sortedOptions.map((option) => {
+        {options.map((option) => {
           const isChecked = selected.includes(option.id);
           const isDisabledByMax = !isChecked && atMax;
           return (

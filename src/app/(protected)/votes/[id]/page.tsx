@@ -9,6 +9,7 @@ import { notFound } from "next/navigation";
 import { cookies } from "next/headers";
 import { BallotWrapper } from "@/components/ballot/ballot-wrapper";
 import { VoteAdminControls } from "./vote-admin-controls";
+import { DescriptionDisplay } from "@/components/description-display";
 import type { Vote, VoteOption } from "@/lib/types";
 
 interface Props {
@@ -37,21 +38,32 @@ export default async function VoteDetailPage({ params }: Props) {
     notFound();
   }
 
-  const { data: options } = await adminClient
-    .from("vote_options")
-    .select("*")
-    .eq("vote_id", id)
-    .order("display_order");
-
-  const { count: participationCount } = await adminClient
-    .from("participation_records")
-    .select("*", { count: "exact", head: true })
-    .eq("vote_id", id);
-
-  const { count: totalMembers } = await adminClient
-    .from("members")
-    .select("*", { count: "exact", head: true })
-    .eq("active", true);
+  // Fetch options, participation count, and member counts in parallel
+  const [
+    { data: options },
+    { count: participationCount },
+    { count: totalMembers },
+    { count: votingMemberCount },
+  ] = await Promise.all([
+    adminClient
+      .from("vote_options")
+      .select("*")
+      .eq("vote_id", id)
+      .order("display_order"),
+    adminClient
+      .from("participation_records")
+      .select("*", { count: "exact", head: true })
+      .eq("vote_id", id),
+    adminClient
+      .from("members")
+      .select("*", { count: "exact", head: true })
+      .eq("active", true),
+    adminClient
+      .from("members")
+      .select("*", { count: "exact", head: true })
+      .eq("active", true)
+      .eq("voting_member", true),
+  ]);
 
   const typedVote = vote as Vote;
   const allOptions = (options || []) as VoteOption[];
@@ -134,7 +146,7 @@ export default async function VoteDetailPage({ params }: Props) {
           </span>
         </div>
         {typedVote.description && (
-          <p className="mt-2 text-gray-600">{typedVote.description}</p>
+          <DescriptionDisplay content={typedVote.description} className="mt-2" />
         )}
       </div>
 
@@ -178,7 +190,7 @@ export default async function VoteDetailPage({ params }: Props) {
           <div className="mt-2">
             <div className="flex justify-between text-sm">
               <span className="text-gray-600">
-                {participationCount ?? 0} of {totalMembers ?? 0} have voted
+                {participationCount ?? 0} of {totalMembers ?? 0} members have voted
               </span>
               <span className="text-gray-500">
                 {totalMembers
@@ -203,7 +215,21 @@ export default async function VoteDetailPage({ params }: Props) {
                 }}
               />
             </div>
+            {votingMemberCount !== totalMembers && (
+              <p className="mt-1 text-xs text-gray-400">
+                Quorum is based on {votingMemberCount ?? 0} voting shareholder{(votingMemberCount ?? 0) !== 1 ? "s" : ""}
+              </p>
+            )}
           </div>
+        </div>
+      )}
+
+      {typedVote.status === "open" && !member.voting_member && (
+        <div className="rounded-lg border-l-4 border-blue-400 bg-blue-50 px-4 py-3">
+          <p className="text-sm text-blue-800">
+            Your voice matters! As a non-voting member, your ballot is welcome and valued.
+            It will be recorded separately from the official shareholder tally.
+          </p>
         </div>
       )}
 
@@ -215,7 +241,7 @@ export default async function VoteDetailPage({ params }: Props) {
               voteId={typedVote.id}
               format={typedVote.format}
               privacyLevel={typedVote.privacy_level}
-              options={typedOptions}
+              options={typedOptions.map(({ id, label, description }) => ({ id, label, description }))}
               existingChoice={existingChoice}
               existingRanking={existingRanking}
               existingResponses={existingResponses}

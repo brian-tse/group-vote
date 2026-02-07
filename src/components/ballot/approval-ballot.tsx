@@ -2,10 +2,10 @@
 "use client";
 
 import { useState } from "react";
-import type { VoteOption } from "@/lib/types";
+import type { BallotOption } from "@/lib/types";
 
 interface ApprovalBallotProps {
-  options: VoteOption[];
+  options: BallotOption[];
   currentApproved: string[] | null;
   onVote: (approved: string[]) => void;
   disabled: boolean;
@@ -19,10 +19,6 @@ export function ApprovalBallot({
 }: ApprovalBallotProps) {
   const [approved, setApproved] = useState<string[]>(
     () => currentApproved ?? []
-  );
-
-  const sortedOptions = [...options].sort(
-    (a, b) => a.display_order - b.display_order
   );
 
   const hasChanged =
@@ -45,7 +41,7 @@ export function ApprovalBallot({
       </p>
 
       <div className="space-y-2">
-        {sortedOptions.map((option) => {
+        {options.map((option) => {
           const isChecked = approved.includes(option.id);
           return (
             <button

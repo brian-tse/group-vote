@@ -2,10 +2,10 @@
 "use client";
 
 import { useState } from "react";
-import type { VoteOption } from "@/lib/types";
+import type { BallotOption } from "@/lib/types";
 
 interface DatePollBallotProps {
-  options: VoteOption[];
+  options: BallotOption[];
   currentResponses: Record<string, string> | null;
   onVote: (responses: Record<string, string>) => void;
   disabled: boolean;
@@ -69,11 +69,7 @@ export function DatePollBallot({
     () => currentResponses ?? {}
   );
 
-  const sortedOptions = [...options].sort(
-    (a, b) => a.display_order - b.display_order
-  );
-
-  const allAnswered = sortedOptions.every((opt) => responses[opt.id]);
+  const allAnswered = options.every((opt) => responses[opt.id]);
 
   const hasChanged =
     currentResponses &&
@@ -90,7 +86,7 @@ export function DatePollBallot({
       </p>
 
       <div className="space-y-3">
-        {sortedOptions.map((option) => (
+        {options.map((option) => (
           <div
             key={option.id}
             className="rounded-lg border-2 border-gray-200 bg-white px-4 py-3"
