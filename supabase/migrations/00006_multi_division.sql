@@ -1,7 +1,8 @@
--- Multi-Division Support
+-- Multi-Division Support (Part 1)
 -- ============================================================
--- Adds division scoping so SM and SF divisions manage their own
--- members/votes independently, with corporation-wide votes supported.
+-- Creates divisions, adds division_id columns, adds enum value.
+-- The enum value cannot be used in the same transaction, so
+-- role promotions and RLS policies referencing it are in Part 2.
 -- ============================================================
 
 -- ============================================================
@@ -64,18 +65,7 @@ update vote_proposals
 alter type member_role add value 'super_admin';
 
 -- ============================================================
--- 7. Promote specific members to super_admin
--- ============================================================
-
-update members set role = 'super_admin'
-  where email in ('tsb@acamedicalgroup.com', 'jf@acamedicalgroup.com', 'sg@acamedicalgroup.com');
-
--- Set observers
-update members set observer = true
-  where email in ('ariel@acamedicalgroup.com', 'amy@acamedicalgroup.com');
-
--- ============================================================
--- 8. Indexes on new columns
+-- 7. Indexes on new columns
 -- ============================================================
 
 create index idx_members_division_id on members (division_id);
@@ -83,7 +73,7 @@ create index idx_votes_division_id on votes (division_id);
 create index idx_proposals_division_id on vote_proposals (division_id);
 
 -- ============================================================
--- 9. RLS on divisions table
+-- 8. RLS on divisions table (read-only policies safe here)
 -- ============================================================
 
 alter table divisions enable row level security;
@@ -91,39 +81,3 @@ alter table divisions enable row level security;
 create policy "Divisions: readable by all authenticated"
   on divisions for select to authenticated
   using (true);
-
-create policy "Divisions: writable by super-admins"
-  on divisions for insert to authenticated
-  with check (
-    exists (
-      select 1 from members
-      where auth_user_id = auth.uid()
-        and role = 'super_admin'
-        and active = true
-    )
-  );
-
-create policy "Divisions: updatable by super-admins"
-  on divisions for update to authenticated
-  using (
-    exists (
-      select 1 from members
-      where auth_user_id = auth.uid()
-        and role = 'super_admin'
-        and active = true
-    )
-  );
-
--- ============================================================
--- 10. Update is_current_user_admin() to include super_admin
--- ============================================================
-
-create or replace function is_current_user_admin()
-returns boolean as $$
-  select exists (
-    select 1 from members
-    where auth_user_id = auth.uid()
-      and role in ('admin', 'super_admin')
-      and active = true
-  );
-$$ language sql security definer stable;
