@@ -10,7 +10,8 @@ import { cookies } from "next/headers";
 import { BallotWrapper } from "@/components/ballot/ballot-wrapper";
 import { VoteAdminControls } from "./vote-admin-controls";
 import { DescriptionDisplay } from "@/components/description-display";
-import type { Vote, VoteOption } from "@/lib/types";
+import { CommentSection } from "@/components/comments/comment-section";
+import type { Vote, VoteOption, VoteComment } from "@/lib/types";
 
 interface Props {
   params: Promise<{ id: string }>;
@@ -38,12 +39,14 @@ export default async function VoteDetailPage({ params }: Props) {
     notFound();
   }
 
-  // Fetch options, participation count, and member counts in parallel
+  // Fetch options, participation count, member counts, and comments in parallel
   const [
     { data: options },
     { count: participationCount },
     { count: totalMembers },
     { count: votingMemberCount },
+    { count: votingShareholderParticipation },
+    { data: rawComments },
   ] = await Promise.all([
     adminClient
       .from("vote_options")
@@ -63,7 +66,33 @@ export default async function VoteDetailPage({ params }: Props) {
       .select("*", { count: "exact", head: true })
       .eq("active", true)
       .eq("voting_member", true),
+    adminClient
+      .from("participation_records")
+      .select("members!inner(voting_member)", { count: "exact", head: true })
+      .eq("vote_id", id)
+      .eq("members.voting_member", true),
+    adminClient
+      .from("vote_comments")
+      .select("*, member:members(name, email)")
+      .eq("vote_id", id)
+      .order("created_at", { ascending: true }),
   ]);
+
+  // Flatten joined member data into VoteComment objects
+  const comments: VoteComment[] = (rawComments || []).map((c: Record<string, unknown>) => {
+    const memberData = c.member as { name: string | null; email: string } | null;
+    return {
+      id: c.id as string,
+      vote_id: c.vote_id as string,
+      member_id: c.member_id as string,
+      parent_id: c.parent_id as string | null,
+      body: c.body as string,
+      created_at: c.created_at as string,
+      updated_at: c.updated_at as string,
+      member_name: memberData?.name ?? null,
+      member_email: memberData?.email ?? "",
+    };
+  });
 
   const typedVote = vote as Vote;
   const allOptions = (options || []) as VoteOption[];
@@ -187,7 +216,7 @@ export default async function VoteDetailPage({ params }: Props) {
       {typedVote.status === "open" && (
         <div className="rounded-lg border bg-white p-5 shadow-sm">
           <h2 className="text-sm font-semibold text-gray-900">Participation</h2>
-          <div className="mt-2">
+          <div className="mt-2 space-y-2">
             <div className="flex justify-between text-sm">
               <span className="text-gray-600">
                 {participationCount ?? 0} of {totalMembers ?? 0} members have voted
@@ -201,24 +230,52 @@ export default async function VoteDetailPage({ params }: Props) {
                 %
               </span>
             </div>
-            <div className="mt-1 h-2 w-full overflow-hidden rounded-full bg-gray-200">
-              <div
-                className="h-2 rounded-full bg-brand-500 transition-all"
-                style={{
-                  width: `${
-                    totalMembers
-                      ? Math.round(
-                          ((participationCount ?? 0) / totalMembers) * 100
-                        )
-                      : 0
-                  }%`,
-                }}
-              />
-            </div>
             {votingMemberCount !== totalMembers && (
-              <p className="mt-1 text-xs text-gray-400">
-                Quorum is based on {votingMemberCount ?? 0} voting shareholder{(votingMemberCount ?? 0) !== 1 ? "s" : ""}
-              </p>
+              <>
+                <div className="flex justify-between text-sm">
+                  <span className="text-gray-600">
+                    {votingShareholderParticipation ?? 0} of {votingMemberCount ?? 0} voting shareholder{(votingMemberCount ?? 0) !== 1 ? "s" : ""} have voted
+                  </span>
+                  <span className="text-gray-500">
+                    {votingMemberCount
+                      ? Math.round(
+                          ((votingShareholderParticipation ?? 0) / votingMemberCount) * 100
+                        )
+                      : 0}
+                    %
+                  </span>
+                </div>
+                <div className="h-2 w-full overflow-hidden rounded-full bg-gray-200">
+                  <div
+                    className="h-2 rounded-full bg-brand-500 transition-all"
+                    style={{
+                      width: `${
+                        votingMemberCount
+                          ? Math.round(
+                              ((votingShareholderParticipation ?? 0) / votingMemberCount) * 100
+                            )
+                          : 0
+                      }%`,
+                    }}
+                  />
+                </div>
+              </>
+            )}
+            {votingMemberCount === totalMembers && (
+              <div className="h-2 w-full overflow-hidden rounded-full bg-gray-200">
+                <div
+                  className="h-2 rounded-full bg-brand-500 transition-all"
+                  style={{
+                    width: `${
+                      totalMembers
+                        ? Math.round(
+                            ((participationCount ?? 0) / totalMembers) * 100
+                          )
+                        : 0
+                    }%`,
+                  }}
+                />
+              </div>
             )}
           </div>
         </div>
@@ -288,6 +345,16 @@ export default async function VoteDetailPage({ params }: Props) {
             ))}
           </ul>
         </div>
+      )}
+
+      {(typedVote.status === "open" || typedVote.status === "closed") && (
+        <CommentSection
+          voteId={typedVote.id}
+          comments={comments}
+          currentMemberId={member.id}
+          isAdmin={member.role === "admin"}
+          isVoteOpen={typedVote.status === "open"}
+        />
       )}
     </div>
   );

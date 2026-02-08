@@ -117,7 +117,8 @@ export async function deleteVote(voteId: string): Promise<void> {
     throw new Error("Vote not found.");
   }
 
-  // Delete related records first (ballots, participation records, reminders)
+  // Delete related records first (comments, ballots, participation records, reminders)
+  await adminClient.from("vote_comments").delete().eq("vote_id", voteId);
   await adminClient.from("ballots").delete().eq("vote_id", voteId);
   await adminClient.from("participation_records").delete().eq("vote_id", voteId);
   await adminClient.from("sent_reminders").delete().eq("vote_id", voteId);

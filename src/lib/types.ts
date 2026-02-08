@@ -82,6 +82,18 @@ export interface BallotRecordNamed {
   cast_at: string;
 }
 
+export interface VoteComment {
+  id: string;
+  vote_id: string;
+  member_id: string;
+  parent_id: string | null;
+  body: string;
+  created_at: string;
+  updated_at: string;
+  member_name: string | null;
+  member_email: string;
+}
+
 export interface VoteProposal {
   id: string;
   proposed_by: string;
