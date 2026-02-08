@@ -186,11 +186,48 @@ export function BallotWrapper({
     [voteId, privacyLevel, hasVoted, sessionToken]
   );
 
+  const optionLabel = (id: string) =>
+    options.find((o) => o.id === id)?.label ?? id;
+
+  function getVoteSummary(): string | null {
+    if (format === "yes_no" || format === "multiple_choice") {
+      if (currentChoice) return optionLabel(currentChoice);
+    }
+    if (format === "ranked_choice" && currentRanking?.length) {
+      return currentRanking.map((id, i) => `${i + 1}. ${optionLabel(id)}`).join(", ");
+    }
+    if (format === "approval" && currentApproved?.length) {
+      return currentApproved.map(optionLabel).join(", ");
+    }
+    if (format === "multi_select" && currentSelected?.length) {
+      return currentSelected.map(optionLabel).join(", ");
+    }
+    if (format === "rsvp" && currentRsvpResponse) {
+      return currentRsvpResponse.charAt(0).toUpperCase() + currentRsvpResponse.slice(1);
+    }
+    if (format === "date_poll" && currentResponses) {
+      return Object.entries(currentResponses)
+        .map(([id, response]) => `${optionLabel(id)}: ${response}`)
+        .join(", ");
+    }
+    if (format === "score_rating" && currentScores) {
+      return Object.entries(currentScores)
+        .map(([id, score]) => `${optionLabel(id)}: ${score}`)
+        .join(", ");
+    }
+    return null;
+  }
+
+  const voteSummary = hasVoted ? getVoteSummary() : null;
+
   return (
     <div className="space-y-4">
       {hasVoted && (
         <div className="rounded-lg bg-green-50 px-4 py-3 text-sm text-green-700">
-          You have already voted. You can change your vote below.
+          <p>You have already voted. You can change your vote below.</p>
+          {voteSummary && (
+            <p className="mt-1 font-medium">Your vote: {voteSummary}</p>
+          )}
         </div>
       )}
 
