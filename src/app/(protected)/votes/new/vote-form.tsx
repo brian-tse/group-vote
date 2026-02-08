@@ -9,7 +9,7 @@ import {
   PASSING_THRESHOLD_LABELS,
   QUORUM_DEFAULT,
 } from "@/lib/constants";
-import type { VoteFormat } from "@/lib/types";
+import type { VoteFormat, Division, MemberRole } from "@/lib/types";
 import { VoteTypeHelp } from "@/components/vote-type-help";
 
 const RichTextEditor = dynamic(
@@ -37,7 +37,14 @@ const FORMATS_WITH_OPTIONS: VoteFormat[] = [
   "multi_select",
 ];
 
-export function VoteForm() {
+interface VoteFormProps {
+  divisions: Division[];
+  memberRole: MemberRole;
+  memberDivisionId: string;
+}
+
+export function VoteForm({ divisions, memberRole, memberDivisionId }: VoteFormProps) {
+  const isSuperAdmin = memberRole === "super_admin";
   const [state, formAction, isPending] = useActionState(createVote, initialState);
   const [format, setFormat] = useState<VoteFormat>("yes_no");
   const [title, setTitle] = useState("");
@@ -80,6 +87,33 @@ export function VoteForm() {
         <div className="rounded-lg bg-red-50 p-4 text-sm text-red-700">
           {state.error}
         </div>
+      )}
+
+      {/* Division selector */}
+      {isSuperAdmin ? (
+        <div>
+          <label htmlFor="division_id" className="block text-sm font-medium text-gray-700">
+            Division *
+          </label>
+          <select
+            id="division_id"
+            name="division_id"
+            defaultValue={memberDivisionId}
+            className="mt-1 block w-full rounded-lg border border-gray-300 px-3 py-2 shadow-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
+          >
+            {divisions.map((div) => (
+              <option key={div.id} value={div.id}>
+                {div.name}
+              </option>
+            ))}
+            <option value="">Corporation-wide</option>
+          </select>
+          <p className="mt-1 text-xs text-gray-500">
+            Corporation-wide votes include all divisions.
+          </p>
+        </div>
+      ) : (
+        <input type="hidden" name="division_id" value={memberDivisionId} />
       )}
 
       <div>

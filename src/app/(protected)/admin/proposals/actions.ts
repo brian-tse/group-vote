@@ -48,6 +48,7 @@ export async function approveProposal(proposalId: string) {
       quorum_percentage: proposal.quorum_percentage,
       passing_threshold: proposal.passing_threshold,
       custom_threshold_percentage: proposal.custom_threshold_percentage,
+      division_id: proposal.division_id,
       created_by: admin.id,
     })
     .select("id")

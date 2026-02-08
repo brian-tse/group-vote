@@ -5,7 +5,7 @@ export default async function AdminLayout({
 }: {
   children: React.ReactNode;
 }) {
-  await requireAdmin();
+  const member = await requireAdmin();
 
   return (
     <div className="space-y-6">
@@ -34,6 +34,14 @@ export default async function AdminLayout({
         >
           Participation
         </a>
+        {member.role === "super_admin" && (
+          <a
+            href="/admin/divisions"
+            className="text-sm font-medium text-navy-400 hover:text-brand-500"
+          >
+            Divisions
+          </a>
+        )}
       </nav>
       {children}
     </div>

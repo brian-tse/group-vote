@@ -1,8 +1,18 @@
 import { requireAdmin } from "@/lib/auth";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { VoteForm } from "./vote-form";
+import type { Division } from "@/lib/types";
 
 export default async function NewVotePage() {
-  await requireAdmin();
+  const member = await requireAdmin();
+
+  const adminClient = createAdminClient();
+  const { data: divisions } = await adminClient
+    .from("divisions")
+    .select("*")
+    .order("name");
+
+  const typedDivisions = (divisions || []) as Division[];
 
   return (
     <div className="mx-auto max-w-2xl space-y-6">
@@ -13,7 +23,11 @@ export default async function NewVotePage() {
           open it for voting.
         </p>
       </div>
-      <VoteForm />
+      <VoteForm
+        divisions={typedDivisions}
+        memberRole={member.role}
+        memberDivisionId={member.division_id}
+      />
     </div>
   );
 }

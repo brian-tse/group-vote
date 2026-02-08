@@ -63,6 +63,20 @@ export default async function ResultsPage({
     );
   }
 
+  // Scope member counts to vote's division (or all for corp-wide)
+  const voteDivisionId = typedVote.division_id;
+
+  const activeMemberQuery = adminClient
+    .from("members")
+    .select("*", { count: "exact", head: true })
+    .eq("active", true);
+
+  const votingMemberQuery = adminClient
+    .from("members")
+    .select("id")
+    .eq("active", true)
+    .eq("voting_member", true);
+
   // Fetch options and member counts in parallel
   const [{ data: options }, { count: activeMemberCount }, { data: votingMembers }] =
     await Promise.all([
@@ -71,15 +85,12 @@ export default async function ResultsPage({
         .select("*")
         .eq("vote_id", id)
         .order("display_order", { ascending: true }),
-      adminClient
-        .from("members")
-        .select("*", { count: "exact", head: true })
-        .eq("active", true),
-      adminClient
-        .from("members")
-        .select("id")
-        .eq("active", true)
-        .eq("voting_member", true),
+      voteDivisionId !== null
+        ? activeMemberQuery.eq("division_id", voteDivisionId)
+        : activeMemberQuery,
+      voteDivisionId !== null
+        ? votingMemberQuery.eq("division_id", voteDivisionId)
+        : votingMemberQuery,
     ]);
 
   const typedOptions = (options || []) as VoteOption[];

@@ -4,14 +4,21 @@ import { ProposalCard } from "./proposal-card";
 import type { VoteProposal, Member } from "@/lib/types";
 
 export default async function AdminProposalsPage() {
-  await requireAdmin();
+  const member = await requireAdmin();
 
   const adminClient = createAdminClient();
 
-  const { data: proposals, error } = await adminClient
+  // Division admins see proposals from their division; super-admins see all
+  const query = adminClient
     .from("vote_proposals")
     .select("*, proposer:members!proposed_by(id, name, email)")
     .order("created_at", { ascending: true });
+
+  const scopedQuery = member.role === "super_admin"
+    ? query
+    : query.eq("division_id", member.division_id);
+
+  const { data: proposals, error } = await scopedQuery;
 
   if (error) {
     throw new Error(`Failed to load proposals: ${error.message}`);

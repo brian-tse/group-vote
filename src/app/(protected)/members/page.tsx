@@ -2,13 +2,24 @@ import { getCurrentMember } from "@/lib/auth";
 import { createAdminClient } from "@/lib/supabase/admin";
 
 export default async function MembersPage() {
-  await getCurrentMember();
+  const member = await getCurrentMember();
   const adminClient = createAdminClient();
 
+  // Fetch division name for heading
+  const { data: division } = await adminClient
+    .from("divisions")
+    .select("name")
+    .eq("id", member.division_id)
+    .single();
+
+  const divisionName = division?.name || "Your Division";
+
+  // Show own division's members
   const { data: members } = await adminClient
     .from("members")
     .select("name, email, voting_member, observer")
     .eq("active", true)
+    .eq("division_id", member.division_id)
     .order("name");
 
   const allMembers = (members || []) as {
@@ -25,7 +36,9 @@ export default async function MembersPage() {
   return (
     <div className="mx-auto max-w-2xl space-y-8">
       <div>
-        <h1 className="text-2xl font-bold text-gray-900">Members</h1>
+        <h1 className="text-2xl font-bold text-gray-900">
+          {divisionName} Members
+        </h1>
         <p className="mt-1 text-sm text-gray-500">
           {allMembers.length} active member{allMembers.length !== 1 ? "s" : ""}
         </p>

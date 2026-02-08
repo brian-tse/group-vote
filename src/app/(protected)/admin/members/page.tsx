@@ -2,15 +2,33 @@ import { requireAdmin } from "@/lib/auth";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { AddMemberForm } from "./add-member-form";
 import { MemberRow } from "./member-row";
+import type { Division } from "@/lib/types";
 
 export default async function AdminMembersPage() {
-  await requireAdmin();
+  const member = await requireAdmin();
 
   const adminClient = createAdminClient();
-  const { data: members, error } = await adminClient
+
+  // Fetch divisions for display
+  const { data: divisions } = await adminClient
+    .from("divisions")
+    .select("*")
+    .order("name");
+
+  const typedDivisions = (divisions || []) as Division[];
+  const divisionMap = new Map(typedDivisions.map((d) => [d.id, d]));
+
+  // Division admins see only their division; super-admins see all
+  const membersQuery = adminClient
     .from("members")
     .select("*")
     .order("name", { ascending: true });
+
+  const scopedQuery = member.role === "super_admin"
+    ? membersQuery
+    : membersQuery.eq("division_id", member.division_id);
+
+  const { data: members, error } = await scopedQuery;
 
   if (error) {
     throw new Error(`Failed to load members: ${error.message}`);
@@ -29,7 +47,11 @@ export default async function AdminMembersPage() {
         </p>
       </div>
 
-      <AddMemberForm />
+      <AddMemberForm
+        divisions={typedDivisions}
+        memberRole={member.role}
+        memberDivisionId={member.division_id}
+      />
 
       <div className="overflow-hidden rounded-lg border bg-white shadow-sm">
         <table className="min-w-full divide-y divide-gray-200">
@@ -41,6 +63,11 @@ export default async function AdminMembersPage() {
               <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
                 Email
               </th>
+              {member.role === "super_admin" && (
+                <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
+                  Division
+                </th>
+              )}
               <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
                 Role
               </th>
@@ -56,8 +83,14 @@ export default async function AdminMembersPage() {
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-200">
-            {members.map((member) => (
-              <MemberRow key={member.id} member={member} />
+            {members.map((m) => (
+              <MemberRow
+                key={m.id}
+                member={m}
+                divisionName={divisionMap.get(m.division_id)?.slug?.toUpperCase()}
+                showDivision={member.role === "super_admin"}
+                isSuperAdmin={member.role === "super_admin"}
+              />
             ))}
           </tbody>
         </table>

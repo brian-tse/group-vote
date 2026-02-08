@@ -3,19 +3,26 @@ import { sendBulkEmail } from "@/lib/email";
 import { voteOpenedEmail, resultsPublishedEmail, reminderEmail } from "@/lib/email-templates";
 
 /**
- * Send "vote opened" email to all active members.
+ * Send "vote opened" email to members in the vote's division (or all for corp-wide).
  */
 export async function notifyVoteOpened(
   voteId: string,
   voteTitle: string,
-  deadline: string | null
+  deadline: string | null,
+  divisionId: string | null
 ): Promise<void> {
   const adminClient = createAdminClient();
 
-  const { data: members } = await adminClient
+  const query = adminClient
     .from("members")
     .select("email")
     .eq("active", true);
+
+  const scopedQuery = divisionId !== null
+    ? query.eq("division_id", divisionId)
+    : query;
+
+  const { data: members } = await scopedQuery;
 
   if (!members || members.length === 0) return;
 
@@ -26,19 +33,26 @@ export async function notifyVoteOpened(
 }
 
 /**
- * Send "results published" email to all active members.
+ * Send "results published" email to members in the vote's division (or all for corp-wide).
  */
 export async function notifyResultsPublished(
   voteId: string,
   voteTitle: string,
-  resultSummary: string
+  resultSummary: string,
+  divisionId: string | null
 ): Promise<void> {
   const adminClient = createAdminClient();
 
-  const { data: members } = await adminClient
+  const query = adminClient
     .from("members")
     .select("email")
     .eq("active", true);
+
+  const scopedQuery = divisionId !== null
+    ? query.eq("division_id", divisionId)
+    : query;
+
+  const { data: members } = await scopedQuery;
 
   if (!members || members.length === 0) return;
 
@@ -49,21 +63,29 @@ export async function notifyResultsPublished(
 }
 
 /**
- * Send a reminder email to non-voters for a specific vote.
+ * Send a reminder email to non-voters for a specific vote,
+ * scoped to the vote's division (or all for corp-wide).
  */
 export async function sendReminderToNonVoters(
   voteId: string,
   voteTitle: string,
   deadline: string | null,
-  urgency: "halfway" | "24h" | "2h" | "manual"
+  urgency: "halfway" | "24h" | "2h" | "manual",
+  divisionId: string | null
 ): Promise<{ sent: number; failed: number }> {
   const adminClient = createAdminClient();
 
-  // Get all active members
-  const { data: allMembers } = await adminClient
+  // Get active members scoped to division
+  const query = adminClient
     .from("members")
     .select("id, email")
     .eq("active", true);
+
+  const scopedQuery = divisionId !== null
+    ? query.eq("division_id", divisionId)
+    : query;
+
+  const { data: allMembers } = await scopedQuery;
 
   if (!allMembers || allMembers.length === 0) {
     return { sent: 0, failed: 0 };

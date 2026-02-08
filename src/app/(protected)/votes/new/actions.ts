@@ -1,6 +1,6 @@
 "use server";
 
-import { requireAdmin } from "@/lib/auth";
+import { requireAdmin, canAdminVote } from "@/lib/auth";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { redirect } from "next/navigation";
 import type { VoteFormat, PrivacyLevel, PassingThreshold } from "@/lib/types";
@@ -35,6 +35,8 @@ export async function createVote(
     ? parseInt(formData.get("custom_threshold_percentage") as string, 10)
     : null;
   const deadlineStr = (formData.get("deadline") as string) || null;
+  const divisionIdRaw = (formData.get("division_id") as string) || null;
+  const divisionId = divisionIdRaw === "" ? null : divisionIdRaw;
 
   // Parse options from dynamic fields (standard text options)
   const options: { label: string; description: string | null }[] = [];
@@ -107,6 +109,11 @@ export async function createVote(
     fieldErrors.max_selections = "Maximum selections must be at least 1.";
   }
 
+  // Validate admin has permission for this division
+  if (!canAdminVote(member, divisionId)) {
+    return { error: "You do not have permission to create votes for this division.", fieldErrors: {} };
+  }
+
   if (Object.keys(fieldErrors).length > 0) {
     return { error: "Please fix the errors below.", fieldErrors };
   }
@@ -126,6 +133,7 @@ export async function createVote(
       custom_threshold_percentage:
         passingThreshold === "custom" ? customThresholdPercentage : null,
       deadline: deadlineStr ? new Date(deadlineStr).toISOString() : null,
+      division_id: divisionId,
       created_by: member.id,
     })
     .select("id")

@@ -1,4 +1,6 @@
 import { getCurrentMember } from "@/lib/auth";
+import { isAdminRole } from "@/lib/auth";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { MobileNav } from "@/components/mobile-nav";
 
 export default async function ProtectedLayout({
@@ -8,12 +10,28 @@ export default async function ProtectedLayout({
 }) {
   const member = await getCurrentMember();
 
+  // Fetch division name for header display
+  const adminClient = createAdminClient();
+  const { data: division } = await adminClient
+    .from("divisions")
+    .select("slug")
+    .eq("id", member.division_id)
+    .single();
+
+  const divisionSlug = division?.slug?.toUpperCase() || "";
+  const showAdmin = isAdminRole(member.role);
+
   return (
     <div className="min-h-screen bg-background">
       <header className="relative border-b border-navy-700 bg-navy-500">
         <div className="mx-auto flex max-w-5xl items-center justify-between px-4 py-3">
           <a href="/dashboard" className="text-lg font-bold text-white">
             ACAMG Voting
+            {divisionSlug && (
+              <span className="ml-1.5 text-sm font-normal text-white/60">
+                · {divisionSlug}
+              </span>
+            )}
           </a>
 
           {/* Desktop nav */}
@@ -48,7 +66,7 @@ export default async function ProtectedLayout({
             >
               Help
             </a>
-            {member.role === "admin" && (
+            {showAdmin && (
               <a
                 href="/admin/votes"
                 className="text-sm text-white/70 hover:text-white"
@@ -69,7 +87,7 @@ export default async function ProtectedLayout({
           </div>
 
           {/* Mobile nav */}
-          <MobileNav isAdmin={member.role === "admin"} email={member.email} />
+          <MobileNav isAdmin={showAdmin} email={member.email} />
         </div>
       </header>
       <main className="mx-auto max-w-5xl px-4 py-6 md:py-8">{children}</main>

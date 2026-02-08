@@ -75,7 +75,7 @@ export async function GET(request: Request) {
   // Fetch all open votes that have a deadline and an opened_at timestamp
   const { data: openVotes, error: fetchError } = await adminClient
     .from("votes")
-    .select("id, title, deadline, opened_at")
+    .select("id, title, deadline, opened_at, division_id")
     .eq("status", "open")
     .not("deadline", "is", null)
     .not("opened_at", "is", null);
@@ -135,7 +135,8 @@ export async function GET(request: Request) {
             vote.id,
             vote.title,
             vote.deadline,
-            check.type
+            check.type,
+            vote.division_id
           );
 
           // Record that this reminder was sent

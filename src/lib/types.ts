@@ -1,4 +1,4 @@
-export type MemberRole = "admin" | "member";
+export type MemberRole = "admin" | "member" | "super_admin";
 
 export type VoteFormat =
   | "yes_no"
@@ -30,6 +30,7 @@ export interface Member {
   active: boolean;
   voting_member: boolean;
   observer: boolean;
+  division_id: string;
   created_at: string;
 }
 
@@ -44,6 +45,7 @@ export interface Vote {
   passing_threshold: PassingThreshold;
   custom_threshold_percentage: number | null;
   deadline: string | null;
+  division_id: string | null;
   created_by: string;
   created_at: string;
   closed_at: string | null;
@@ -106,7 +108,15 @@ export interface VoteProposal {
   quorum_percentage: number;
   passing_threshold: PassingThreshold;
   custom_threshold_percentage: number | null;
+  division_id: string | null;
   status: ProposalStatus;
   admin_notes: string | null;
+  created_at: string;
+}
+
+export interface Division {
+  id: string;
+  name: string;
+  slug: string;
   created_at: string;
 }

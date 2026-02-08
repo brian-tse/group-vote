@@ -2,9 +2,16 @@
 
 import { useTransition } from "react";
 import { toggleMemberActive, toggleMemberRole, toggleVotingMember, removeMember } from "./actions";
-import type { Member } from "@/lib/types";
+import type { Member, MemberRole } from "@/lib/types";
 
-export function MemberRow({ member }: { member: Member }) {
+interface MemberRowProps {
+  member: Member;
+  divisionName?: string;
+  showDivision: boolean;
+  isSuperAdmin: boolean;
+}
+
+export function MemberRow({ member, divisionName, showDivision, isSuperAdmin }: MemberRowProps) {
   const [isPending, startTransition] = useTransition();
 
   function handleToggle() {
@@ -14,7 +21,14 @@ export function MemberRow({ member }: { member: Member }) {
   }
 
   function handleToggleRole() {
-    const newRole = member.role === "admin" ? "member" : "admin";
+    let newRole: MemberRole;
+    if (member.role === "super_admin") {
+      newRole = "admin";
+    } else if (member.role === "admin") {
+      newRole = "member";
+    } else {
+      newRole = "admin";
+    }
     if (
       !confirm(
         `Change ${member.email} role to ${newRole}?`
@@ -39,6 +53,26 @@ export function MemberRow({ member }: { member: Member }) {
     });
   }
 
+  const roleStyle =
+    member.role === "super_admin"
+      ? "inline-flex rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-800"
+      : member.role === "admin"
+        ? "inline-flex rounded-full bg-purple-100 px-2 py-0.5 text-xs font-medium text-purple-800"
+        : "inline-flex rounded-full bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-800";
+
+  const roleLabel =
+    member.role === "super_admin" ? "super admin" : member.role;
+
+  // Role toggle button label
+  let roleToggleLabel: string;
+  if (member.role === "super_admin") {
+    roleToggleLabel = "Make Admin";
+  } else if (member.role === "admin") {
+    roleToggleLabel = "Make Member";
+  } else {
+    roleToggleLabel = "Make Admin";
+  }
+
   return (
     <tr className={isPending ? "opacity-50" : ""}>
       <td className="whitespace-nowrap px-4 py-3 text-sm text-gray-900">
@@ -47,15 +81,14 @@ export function MemberRow({ member }: { member: Member }) {
       <td className="whitespace-nowrap px-4 py-3 text-sm text-gray-500">
         {member.email}
       </td>
+      {showDivision && (
+        <td className="whitespace-nowrap px-4 py-3 text-sm text-gray-500">
+          {divisionName || "\u2014"}
+        </td>
+      )}
       <td className="whitespace-nowrap px-4 py-3 text-sm">
-        <span
-          className={
-            member.role === "admin"
-              ? "inline-flex rounded-full bg-purple-100 px-2 py-0.5 text-xs font-medium text-purple-800"
-              : "inline-flex rounded-full bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-800"
-          }
-        >
-          {member.role}
+        <span className={roleStyle}>
+          {roleLabel}
         </span>
       </td>
       <td className="whitespace-nowrap px-4 py-3 text-sm">
@@ -87,13 +120,15 @@ export function MemberRow({ member }: { member: Member }) {
         </button>
       </td>
       <td className="whitespace-nowrap px-4 py-3 text-right text-sm">
-        <button
-          onClick={handleToggleRole}
-          disabled={isPending}
-          className="mr-2 text-purple-600 hover:text-purple-800 disabled:opacity-50"
-        >
-          {member.role === "admin" ? "Make Member" : "Make Admin"}
-        </button>
+        {isSuperAdmin && (
+          <button
+            onClick={handleToggleRole}
+            disabled={isPending}
+            className="mr-2 text-purple-600 hover:text-purple-800 disabled:opacity-50"
+          >
+            {roleToggleLabel}
+          </button>
+        )}
         <button
           onClick={handleToggle}
           disabled={isPending}

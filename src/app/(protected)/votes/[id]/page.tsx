@@ -1,4 +1,5 @@
 import { getCurrentMember } from "@/lib/auth";
+import { isAdminRole, canAdminVote } from "@/lib/auth";
 import { createAdminClient } from "@/lib/supabase/admin";
 import {
   VOTE_FORMAT_LABELS,
@@ -32,12 +33,45 @@ export default async function VoteDetailPage({ params }: Props) {
     notFound();
   }
 
+  // Access control: member sees vote if it's their division OR corp-wide
+  const isAdmin = isAdminRole(member.role);
+  const voteDivisionId = vote.division_id as string | null;
+  const canSeeVote =
+    voteDivisionId === null ||
+    voteDivisionId === member.division_id ||
+    isAdmin;
+
+  if (!canSeeVote) {
+    notFound();
+  }
+
   if (
-    member.role !== "admin" &&
+    !isAdmin &&
     !["open", "closed"].includes(vote.status)
   ) {
     notFound();
   }
+
+  // Build member filter for participation counts based on vote division
+  // Corp-wide (null): all active members; division-scoped: members in that division
+  const memberFilterBase = adminClient
+    .from("members")
+    .select("*", { count: "exact", head: true })
+    .eq("active", true);
+
+  const memberFilterWithDivision = voteDivisionId !== null
+    ? memberFilterBase.eq("division_id", voteDivisionId)
+    : memberFilterBase;
+
+  const votingMemberFilterBase = adminClient
+    .from("members")
+    .select("*", { count: "exact", head: true })
+    .eq("active", true)
+    .eq("voting_member", true);
+
+  const votingMemberFilterWithDivision = voteDivisionId !== null
+    ? votingMemberFilterBase.eq("division_id", voteDivisionId)
+    : votingMemberFilterBase;
 
   // Fetch options, participation count, member counts, and comments in parallel
   const [
@@ -57,15 +91,8 @@ export default async function VoteDetailPage({ params }: Props) {
       .from("participation_records")
       .select("*", { count: "exact", head: true })
       .eq("vote_id", id),
-    adminClient
-      .from("members")
-      .select("*", { count: "exact", head: true })
-      .eq("active", true),
-    adminClient
-      .from("members")
-      .select("*", { count: "exact", head: true })
-      .eq("active", true)
-      .eq("voting_member", true),
+    memberFilterWithDivision,
+    votingMemberFilterWithDivision,
     adminClient
       .from("participation_records")
       .select("members!inner(voting_member)", { count: "exact", head: true })
@@ -94,16 +121,26 @@ export default async function VoteDetailPage({ params }: Props) {
     };
   });
 
+  // Check if current admin can manage this vote
+  const canAdmin = canAdminVote(member, voteDivisionId);
+
   // Admin: fetch member participation details for open votes
   let votedMembers: { name: string | null; email: string; voting_member: boolean; voted_at: string }[] = [];
   let notVotedMembers: { name: string | null; email: string; voting_member: boolean }[] = [];
-  if (member.role === "admin" && vote.status === "open") {
+  if (canAdmin && vote.status === "open") {
+    // Scope member list to vote's division (or all for corp-wide)
+    const membersQuery = adminClient
+      .from("members")
+      .select("id, name, email, voting_member")
+      .eq("active", true)
+      .order("name");
+
+    const scopedMembersQuery = voteDivisionId !== null
+      ? membersQuery.eq("division_id", voteDivisionId)
+      : membersQuery;
+
     const [{ data: allMembers }, { data: participationRecords }] = await Promise.all([
-      adminClient
-        .from("members")
-        .select("id, name, email, voting_member")
-        .eq("active", true)
-        .order("name"),
+      scopedMembersQuery,
       adminClient
         .from("participation_records")
         .select("member_id, voted_at")
@@ -206,13 +243,18 @@ export default async function VoteDetailPage({ params }: Props) {
           <span className="inline-flex rounded-full bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-800">
             {typedVote.status.replace("_", " ")}
           </span>
+          {typedVote.division_id === null && (
+            <span className="inline-flex rounded-full bg-purple-100 px-2 py-0.5 text-xs font-medium text-purple-800">
+              Corp-wide
+            </span>
+          )}
         </div>
         {typedVote.description && (
           <DescriptionDisplay content={typedVote.description} className="mt-2" />
         )}
       </div>
 
-      {member.role === "admin" && (
+      {canAdmin && (
         <VoteAdminControls voteId={typedVote.id} status={typedVote.status} />
       )}
 
@@ -314,7 +356,7 @@ export default async function VoteDetailPage({ params }: Props) {
         </div>
       )}
 
-      {typedVote.status === "open" && member.role === "admin" && (
+      {typedVote.status === "open" && canAdmin && (
         <div className="rounded-lg border bg-white p-5 shadow-sm">
           <h2 className="text-sm font-semibold text-gray-900">
             Who Voted <span className="font-normal text-gray-400">(admin only)</span>
@@ -444,7 +486,7 @@ export default async function VoteDetailPage({ params }: Props) {
           voteId={typedVote.id}
           comments={comments}
           currentMemberId={member.id}
-          isAdmin={member.role === "admin"}
+          isAdmin={isAdmin}
           isVoteOpen={typedVote.status === "open"}
         />
       )}

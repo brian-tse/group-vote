@@ -4,24 +4,34 @@ import { ParticipationTable } from "./participation-table";
 import type { Member } from "@/lib/types";
 
 export default async function AdminParticipationPage() {
-  await requireAdmin();
+  const currentMember = await requireAdmin();
   const adminClient = createAdminClient();
 
-  // Fetch all active members
-  const { data: members } = await adminClient
+  // Scope to division for division admins, all for super-admins
+  const membersQuery = adminClient
     .from("members")
     .select("*")
     .eq("active", true)
     .order("name", { ascending: true });
 
+  const scopedMembersQuery = currentMember.role === "super_admin"
+    ? membersQuery
+    : membersQuery.eq("division_id", currentMember.division_id);
+
+  const { data: members } = await scopedMembersQuery;
   const typedMembers = (members || []) as Member[];
 
-  // Fetch all closed votes (for calculating totals)
-  const { count: closedVoteCount } = await adminClient
+  // Fetch closed votes scoped by division (or all for super-admins)
+  const closedVotesQuery = adminClient
     .from("votes")
     .select("*", { count: "exact", head: true })
     .eq("status", "closed");
 
+  const scopedClosedVotesQuery = currentMember.role === "super_admin"
+    ? closedVotesQuery
+    : closedVotesQuery.or(`division_id.eq.${currentMember.division_id},division_id.is.null`);
+
+  const { count: closedVoteCount } = await scopedClosedVotesQuery;
   const totalClosedVotes = closedVoteCount || 0;
 
   // Fetch all participation records for closed votes

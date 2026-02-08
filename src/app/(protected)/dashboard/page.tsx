@@ -1,23 +1,38 @@
 import { getCurrentMember } from "@/lib/auth";
+import { isAdminRole } from "@/lib/auth";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { VOTE_FORMAT_LABELS } from "@/lib/constants";
 import type { Vote } from "@/lib/types";
+
+function DivisionBadge({ vote }: { vote: Vote }) {
+  if (vote.division_id === null) {
+    return (
+      <span className="rounded-full bg-purple-100 px-2 py-0.5 text-xs font-medium text-purple-800">
+        Corp-wide
+      </span>
+    );
+  }
+  return null;
+}
 
 export default async function DashboardPage() {
   const member = await getCurrentMember();
   const adminClient = createAdminClient();
 
   // Fetch open votes and recent results in parallel
+  // Filter: member's division OR corp-wide (division_id IS NULL)
   const [{ data: openVotes }, { data: recentResults }] = await Promise.all([
     adminClient
       .from("votes")
       .select("*")
       .eq("status", "open")
+      .or(`division_id.eq.${member.division_id},division_id.is.null`)
       .order("created_at", { ascending: false }),
     adminClient
       .from("votes")
       .select("*")
       .eq("status", "closed")
+      .or(`division_id.eq.${member.division_id},division_id.is.null`)
       .order("closed_at", { ascending: false })
       .limit(10),
   ]);
@@ -78,9 +93,12 @@ export default async function DashboardPage() {
                   }`}
                 >
                   <div>
-                    <span className="font-medium text-gray-900">
-                      {vote.title}
-                    </span>
+                    <div className="flex items-center gap-2">
+                      <span className="font-medium text-gray-900">
+                        {vote.title}
+                      </span>
+                      <DivisionBadge vote={vote} />
+                    </div>
                     <div className="mt-1 flex gap-2 text-xs text-gray-500">
                       <span>{VOTE_FORMAT_LABELS[vote.format]}</span>
                       {vote.deadline && (
@@ -125,9 +143,12 @@ export default async function DashboardPage() {
                 className="flex items-center justify-between rounded-lg border bg-white px-5 py-4 shadow-sm hover:border-brand-300 hover:shadow"
               >
                 <div>
-                  <span className="font-medium text-gray-900">
-                    {vote.title}
-                  </span>
+                  <div className="flex items-center gap-2">
+                    <span className="font-medium text-gray-900">
+                      {vote.title}
+                    </span>
+                    <DivisionBadge vote={vote} />
+                  </div>
                   <div className="mt-1 text-xs text-gray-500">
                     Closed{" "}
                     {vote.closed_at
@@ -158,7 +179,7 @@ export default async function DashboardPage() {
         >
           My Voting History
         </a>
-        {member.role === "admin" && (
+        {isAdminRole(member.role) && (
           <a
             href="/admin/votes"
             className="rounded-lg border border-brand-300 px-4 py-2 text-sm font-medium text-brand-700 hover:bg-brand-50"

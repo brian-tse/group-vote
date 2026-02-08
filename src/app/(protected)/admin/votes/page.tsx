@@ -1,4 +1,5 @@
 import { requireAdmin } from "@/lib/auth";
+import { isAdminRole, canAdminVote } from "@/lib/auth";
 import { createAdminClient } from "@/lib/supabase/admin";
 import {
   VOTE_FORMAT_LABELS,
@@ -14,13 +15,21 @@ const STATUS_STYLES: Record<string, string> = {
 };
 
 export default async function AdminVotesPage() {
-  await requireAdmin();
+  const member = await requireAdmin();
 
   const adminClient = createAdminClient();
-  const { data: votes, error } = await adminClient
+
+  // Super-admins see all votes; division admins see their division + corp-wide
+  const query = adminClient
     .from("votes")
     .select("*")
     .order("created_at", { ascending: false });
+
+  const scopedQuery = member.role === "super_admin"
+    ? query
+    : query.or(`division_id.eq.${member.division_id},division_id.is.null`);
+
+  const { data: votes, error } = await scopedQuery;
 
   if (error) {
     throw new Error(`Failed to load votes: ${error.message}`);
@@ -55,12 +64,19 @@ export default async function AdminVotesPage() {
               className="flex items-center justify-between rounded-lg border bg-white px-4 py-3 shadow-sm"
             >
               <div>
-                <a
-                  href={`/votes/${vote.id}`}
-                  className="font-medium text-gray-900 hover:text-brand-500"
-                >
-                  {vote.title}
-                </a>
+                <div className="flex items-center gap-2">
+                  <a
+                    href={`/votes/${vote.id}`}
+                    className="font-medium text-gray-900 hover:text-brand-500"
+                  >
+                    {vote.title}
+                  </a>
+                  {vote.division_id === null && (
+                    <span className="rounded-full bg-purple-100 px-2 py-0.5 text-xs font-medium text-purple-800">
+                      Corp-wide
+                    </span>
+                  )}
+                </div>
                 <div className="mt-1 flex gap-3 text-xs text-gray-500">
                   <span>{VOTE_FORMAT_LABELS[vote.format]}</span>
                   <span>{PRIVACY_LEVEL_LABELS[vote.privacy_level]}</span>

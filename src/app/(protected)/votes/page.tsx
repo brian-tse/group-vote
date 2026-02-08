@@ -8,11 +8,13 @@ export default async function VotesPage() {
   const adminClient = createAdminClient();
 
   // Fetch votes and participation records in parallel
+  // Filter: member's division OR corp-wide
   const [{ data: allVotes }, { data: myParticipation }] = await Promise.all([
     adminClient
       .from("votes")
       .select("*")
       .in("status", ["open", "closed"])
+      .or(`division_id.eq.${member.division_id},division_id.is.null`)
       .order("created_at", { ascending: false }),
     adminClient
       .from("participation_records")
@@ -82,9 +84,16 @@ export default async function VotesPage() {
                 className="flex items-center justify-between rounded-lg border bg-white px-5 py-4 shadow-sm hover:border-brand-300"
               >
                 <div>
-                  <span className="font-medium text-gray-900">
-                    {vote.title}
-                  </span>
+                  <div className="flex items-center gap-2">
+                    <span className="font-medium text-gray-900">
+                      {vote.title}
+                    </span>
+                    {vote.division_id === null && (
+                      <span className="rounded-full bg-purple-100 px-2 py-0.5 text-xs font-medium text-purple-800">
+                        Corp-wide
+                      </span>
+                    )}
+                  </div>
                   <div className="mt-0.5 text-xs text-gray-500">
                     {VOTE_FORMAT_LABELS[vote.format]} — Voted{" "}
                     {new Date(
@@ -117,9 +126,16 @@ export default async function VotesPage() {
                 className="flex items-center justify-between rounded-lg border bg-white px-5 py-4 shadow-sm hover:border-brand-300"
               >
                 <div>
-                  <span className="font-medium text-gray-900">
-                    {vote.title}
-                  </span>
+                  <div className="flex items-center gap-2">
+                    <span className="font-medium text-gray-900">
+                      {vote.title}
+                    </span>
+                    {vote.division_id === null && (
+                      <span className="rounded-full bg-purple-100 px-2 py-0.5 text-xs font-medium text-purple-800">
+                        Corp-wide
+                      </span>
+                    )}
+                  </div>
                   <div className="mt-0.5 text-xs text-gray-500">
                     {VOTE_FORMAT_LABELS[vote.format]} — Voted{" "}
                     {new Date(
@@ -148,9 +164,16 @@ export default async function VotesPage() {
                 className="flex items-center justify-between rounded-lg border bg-white px-5 py-4 shadow-sm hover:border-brand-300"
               >
                 <div>
-                  <span className="font-medium text-gray-900">
-                    {vote.title}
-                  </span>
+                  <div className="flex items-center gap-2">
+                    <span className="font-medium text-gray-900">
+                      {vote.title}
+                    </span>
+                    {vote.division_id === null && (
+                      <span className="rounded-full bg-purple-100 px-2 py-0.5 text-xs font-medium text-purple-800">
+                        Corp-wide
+                      </span>
+                    )}
+                  </div>
                   <div className="mt-0.5 text-xs text-gray-500">
                     {VOTE_FORMAT_LABELS[vote.format]} — Closed{" "}
                     {vote.closed_at

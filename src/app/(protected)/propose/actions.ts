@@ -152,6 +152,7 @@ export async function proposeVote(
     passing_threshold: passingThreshold,
     custom_threshold_percentage:
       passingThreshold === "custom" ? customThresholdPercentage : null,
+    division_id: member.division_id,
     status: "pending",
   });
 
@@ -166,7 +167,7 @@ export async function proposeVote(
   const { data: admins } = await adminClient
     .from("members")
     .select("email")
-    .eq("role", "admin")
+    .in("role", ["admin", "super_admin"])
     .eq("active", true);
 
   if (admins && admins.length > 0) {
