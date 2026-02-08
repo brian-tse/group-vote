@@ -227,7 +227,7 @@ export default async function VoteDetailPage({ params }: Props) {
       {typedVote.status === "open" && !member.voting_member && (
         <div className="rounded-lg border-l-4 border-blue-400 bg-blue-50 px-4 py-3">
           <p className="text-sm text-blue-800">
-            Your voice matters! As a non-voting member, your ballot is welcome and valued.
+            Your voice matters! As a shareholder-track member, your ballot is welcome and valued.
             It will be recorded separately from the official shareholder tally.
           </p>
         </div>
