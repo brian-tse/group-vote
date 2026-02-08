@@ -95,7 +95,7 @@ export default async function VoteDetailPage({ params }: Props) {
   });
 
   // Admin: fetch member participation details for open votes
-  let votedMembers: { name: string | null; email: string; voting_member: boolean }[] = [];
+  let votedMembers: { name: string | null; email: string; voting_member: boolean; voted_at: string }[] = [];
   let notVotedMembers: { name: string | null; email: string; voting_member: boolean }[] = [];
   if (member.role === "admin" && vote.status === "open") {
     const [{ data: allMembers }, { data: participationRecords }] = await Promise.all([
@@ -106,17 +106,23 @@ export default async function VoteDetailPage({ params }: Props) {
         .order("name"),
       adminClient
         .from("participation_records")
-        .select("member_id")
+        .select("member_id, voted_at")
         .eq("vote_id", id),
     ]);
 
-    const votedIds = new Set((participationRecords || []).map((p: { member_id: string }) => p.member_id));
+    const votedMap = new Map(
+      (participationRecords || []).map((p: { member_id: string; voted_at: string }) => [p.member_id, p.voted_at])
+    );
     for (const m of allMembers || []) {
-      const entry = { name: (m as { name: string | null }).name, email: (m as { email: string }).email, voting_member: (m as { voting_member: boolean }).voting_member };
-      if (votedIds.has((m as { id: string }).id)) {
-        votedMembers.push(entry);
+      const mid = (m as { id: string }).id;
+      const name = (m as { name: string | null }).name;
+      const email = (m as { email: string }).email;
+      const voting_member = (m as { voting_member: boolean }).voting_member;
+      const voted_at = votedMap.get(mid);
+      if (voted_at) {
+        votedMembers.push({ name, email, voting_member, voted_at });
       } else {
-        notVotedMembers.push(entry);
+        notVotedMembers.push({ name, email, voting_member });
       }
     }
   }
@@ -328,6 +334,9 @@ export default async function VoteDetailPage({ params }: Props) {
                       {!m.voting_member && (
                         <span className="ml-1 text-xs text-gray-400">(non-voting)</span>
                       )}
+                      <span className="ml-1 text-xs text-gray-400">
+                        {new Date(m.voted_at).toLocaleString()}
+                      </span>
                     </li>
                   ))}
                 </ul>
