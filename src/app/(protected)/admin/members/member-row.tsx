@@ -1,7 +1,7 @@
 "use client";
 
 import { useTransition } from "react";
-import { toggleMemberActive, toggleMemberRole, toggleVotingMember, removeMember } from "./actions";
+import { toggleMemberActive, toggleMemberRole, toggleVotingMember, toggleObserver, removeMember } from "./actions";
 import type { Member, MemberRole } from "@/lib/types";
 
 interface MemberRowProps {
@@ -43,6 +43,12 @@ export function MemberRow({ member, divisionName, showDivision, isSuperAdmin }: 
   function handleToggleVoting() {
     startTransition(() => {
       toggleVotingMember(member.id, !member.voting_member);
+    });
+  }
+
+  function handleToggleObserver() {
+    startTransition(() => {
+      toggleObserver(member.id, !member.observer);
     });
   }
 
@@ -116,6 +122,23 @@ export function MemberRow({ member, divisionName, showDivision, isSuperAdmin }: 
             }
           >
             {member.voting_member ? "Shareholder" : "Non-voting"}
+          </span>
+        </button>
+      </td>
+      <td className="whitespace-nowrap px-4 py-3 text-sm">
+        <button
+          onClick={handleToggleObserver}
+          disabled={isPending}
+          className="inline-flex items-center gap-1.5 disabled:opacity-50"
+        >
+          <span
+            className={
+              member.observer
+                ? "inline-flex rounded-full bg-orange-100 px-2 py-0.5 text-xs font-medium text-orange-800"
+                : "inline-flex rounded-full bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-500"
+            }
+          >
+            {member.observer ? "Observer" : "—"}
           </span>
         </button>
       </td>

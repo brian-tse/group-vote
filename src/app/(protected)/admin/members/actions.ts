@@ -170,6 +170,34 @@ export async function toggleVotingMember(memberId: string, votingMember: boolean
   revalidatePath("/admin/members");
 }
 
+export async function toggleObserver(memberId: string, observer: boolean) {
+  const currentMember = await requireAdmin();
+  const adminClient = createAdminClient();
+
+  // Verify admin has permission for this member's division
+  if (currentMember.role !== "super_admin") {
+    const { data: target } = await adminClient
+      .from("members")
+      .select("division_id")
+      .eq("id", memberId)
+      .single();
+    if (target?.division_id !== currentMember.division_id) {
+      throw new Error("You can only manage members in your own division.");
+    }
+  }
+
+  const { error } = await adminClient
+    .from("members")
+    .update({ observer })
+    .eq("id", memberId);
+
+  if (error) {
+    throw new Error(`Failed to update observer status: ${error.message}`);
+  }
+
+  revalidatePath("/admin/members");
+}
+
 export async function removeMember(memberId: string) {
   const currentMember = await requireAdmin();
   const adminClient = createAdminClient();
