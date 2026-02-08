@@ -31,6 +31,12 @@ export default async function ProtectedLayout({
               Propose
             </a>
             <a
+              href="/members"
+              className="text-sm text-white/70 hover:text-white"
+            >
+              Members
+            </a>
+            <a
               href="/votes"
               className="text-sm text-white/70 hover:text-white"
             >

@@ -45,6 +45,12 @@ export function MobileNav({ isAdmin, email }: MobileNavProps) {
               Propose
             </a>
             <a
+              href="/members"
+              className="rounded-lg px-3 py-2.5 text-sm font-medium text-white/80 hover:bg-white/10 hover:text-white"
+            >
+              Members
+            </a>
+            <a
               href="/votes"
               className="rounded-lg px-3 py-2.5 text-sm font-medium text-white/80 hover:bg-white/10 hover:text-white"
             >

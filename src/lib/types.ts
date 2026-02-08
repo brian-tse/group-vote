@@ -29,6 +29,7 @@ export interface Member {
   role: MemberRole;
   active: boolean;
   voting_member: boolean;
+  observer: boolean;
   created_at: string;
 }
 

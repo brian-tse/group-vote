@@ -32,6 +32,10 @@ export async function castVote(input: CastVoteInput): Promise<VoteActionResult> 
   const member = await getCurrentMember();
   const adminClient = createAdminClient();
 
+  if (member.observer) {
+    return { error: "Observers cannot vote." };
+  }
+
   // Verify the vote is open
   const { data: vote, error: voteError } = await adminClient
     .from("votes")
@@ -146,6 +150,10 @@ export async function castVote(input: CastVoteInput): Promise<VoteActionResult> 
 export async function changeVote(input: ChangeVoteInput): Promise<VoteActionResult> {
   const member = await getCurrentMember();
   const adminClient = createAdminClient();
+
+  if (member.observer) {
+    return { error: "Observers cannot vote." };
+  }
 
   // Verify the vote is open
   const { data: vote, error: voteError } = await adminClient
