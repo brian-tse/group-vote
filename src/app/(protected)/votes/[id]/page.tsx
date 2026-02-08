@@ -377,7 +377,7 @@ export default async function VoteDetailPage({ params }: Props) {
                         <span className="ml-1 text-xs text-gray-400">(non-voting)</span>
                       )}
                       <span className="ml-1 text-xs text-gray-400">
-                        {new Date(m.voted_at).toLocaleString()}
+                        {new Date(m.voted_at).toLocaleString("en-US", { timeZone: "America/Los_Angeles", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}
                       </span>
                     </li>
                   ))}
