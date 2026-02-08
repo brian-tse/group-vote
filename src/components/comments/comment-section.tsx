@@ -23,6 +23,7 @@ export function CommentSection({
 }: CommentSectionProps) {
   const [replyingTo, setReplyingTo] = useState<string | null>(null);
   const [editingCommentId, setEditingCommentId] = useState<string | null>(null);
+  const [showCommentForm, setShowCommentForm] = useState(false);
 
   // Group into threads: top-level sorted newest first, replies sorted oldest first
   const threads = useMemo(() => {
@@ -72,11 +73,28 @@ export function CommentSection({
         </span>
       </h2>
 
-      {isVoteOpen && (
+      {isVoteOpen && !showCommentForm && (
+        <div className="mt-3">
+          <button
+            onClick={() => setShowCommentForm(true)}
+            className="text-sm text-gray-400 hover:text-gray-600"
+          >
+            Add a comment...
+          </button>
+        </div>
+      )}
+
+      {isVoteOpen && showCommentForm && (
         <div className="mt-4">
           <CommentForm
             submitLabel="Comment"
-            onSubmit={async (body) => addComment(voteId, body)}
+            autoFocus
+            onCancel={() => setShowCommentForm(false)}
+            onSubmit={async (body) => {
+              const result = await addComment(voteId, body);
+              if (!result.error) setShowCommentForm(false);
+              return result;
+            }}
           />
         </div>
       )}
