@@ -94,6 +94,33 @@ export default async function VoteDetailPage({ params }: Props) {
     };
   });
 
+  // Admin: fetch member participation details for open votes
+  let votedMembers: { name: string | null; email: string; voting_member: boolean }[] = [];
+  let notVotedMembers: { name: string | null; email: string; voting_member: boolean }[] = [];
+  if (member.role === "admin" && vote.status === "open") {
+    const [{ data: allMembers }, { data: participationRecords }] = await Promise.all([
+      adminClient
+        .from("members")
+        .select("id, name, email, voting_member")
+        .eq("active", true)
+        .order("name"),
+      adminClient
+        .from("participation_records")
+        .select("member_id")
+        .eq("vote_id", id),
+    ]);
+
+    const votedIds = new Set((participationRecords || []).map((p: { member_id: string }) => p.member_id));
+    for (const m of allMembers || []) {
+      const entry = { name: (m as { name: string | null }).name, email: (m as { email: string }).email, voting_member: (m as { voting_member: boolean }).voting_member };
+      if (votedIds.has((m as { id: string }).id)) {
+        votedMembers.push(entry);
+      } else {
+        notVotedMembers.push(entry);
+      }
+    }
+  }
+
   const typedVote = vote as Vote;
   const allOptions = (options || []) as VoteOption[];
 
@@ -277,6 +304,54 @@ export default async function VoteDetailPage({ params }: Props) {
                 />
               </div>
             )}
+          </div>
+        </div>
+      )}
+
+      {typedVote.status === "open" && member.role === "admin" && (
+        <div className="rounded-lg border bg-white p-5 shadow-sm">
+          <h2 className="text-sm font-semibold text-gray-900">
+            Who Voted <span className="font-normal text-gray-400">(admin only)</span>
+          </h2>
+          <div className="mt-3 grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <div>
+              <h3 className="text-xs font-medium text-green-700 uppercase tracking-wide">
+                Voted ({votedMembers.length})
+              </h3>
+              {votedMembers.length === 0 ? (
+                <p className="mt-1 text-sm text-gray-400">No one yet</p>
+              ) : (
+                <ul className="mt-1 space-y-0.5">
+                  {votedMembers.map((m) => (
+                    <li key={m.email} className="text-sm text-gray-700">
+                      {m.name || m.email}
+                      {!m.voting_member && (
+                        <span className="ml-1 text-xs text-gray-400">(non-voting)</span>
+                      )}
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+            <div>
+              <h3 className="text-xs font-medium text-red-700 uppercase tracking-wide">
+                Not Yet Voted ({notVotedMembers.length})
+              </h3>
+              {notVotedMembers.length === 0 ? (
+                <p className="mt-1 text-sm text-gray-400">Everyone voted!</p>
+              ) : (
+                <ul className="mt-1 space-y-0.5">
+                  {notVotedMembers.map((m) => (
+                    <li key={m.email} className="text-sm text-gray-700">
+                      {m.name || m.email}
+                      {!m.voting_member && (
+                        <span className="ml-1 text-xs text-gray-400">(non-voting)</span>
+                      )}
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
           </div>
         </div>
       )}
