@@ -101,16 +101,17 @@ export default async function ResultsPage({
   const isAnonymous = typedVote.privacy_level === "anonymous";
 
   // Official tally: voting shareholders only (quorum based on voting members)
-  // For anonymous votes, we can't filter ballots by member, so official = all
+  // For anonymous votes, passing votingMemberIds triggers filtering by the
+  // voting_member flag on ballot_records_anonymous instead of by member_id.
   const result = await tallyVote(
     typedVote,
     typedOptions,
     votingMemberCount,
-    isAnonymous ? undefined : votingMemberIds
+    votingMemberIds
   );
 
-  // All-members tally (only needed if there are non-voting members and it's not anonymous)
-  const allMembersResult = hasNonVotingMembers && !isAnonymous
+  // All-members tally (only needed if there are non-voting members)
+  const allMembersResult = hasNonVotingMembers
     ? await tallyVote(typedVote, typedOptions, activeMemberCount || 0)
     : null;
 

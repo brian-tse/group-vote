@@ -120,13 +120,12 @@ export async function closeVote(voteId: string, notify: boolean = true): Promise
       const typedOptions = (options || []) as VoteOption[];
       const votingMemberIds = (votingMembers || []).map((m: { id: string }) => m.id);
       const closedVote = { ...typedVote, status: "closed" as const } as Vote;
-      const isAnonymous = closedVote.privacy_level === "anonymous";
 
       const result = await tallyVote(
         closedVote,
         typedOptions,
         votingMemberIds.length,
-        isAnonymous ? undefined : votingMemberIds
+        votingMemberIds
       );
 
       await notifyResultsPublished(
