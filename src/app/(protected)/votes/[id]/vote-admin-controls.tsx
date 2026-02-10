@@ -1,7 +1,7 @@
 "use client";
 
 import { useTransition, useState } from "react";
-import { openVote, closeVote, deleteVote } from "@/lib/actions/vote-admin-actions";
+import { openVote, closeVote, deleteVote, resendCloseNotification } from "@/lib/actions/vote-admin-actions";
 
 interface VoteAdminControlsProps {
   voteId: string;
@@ -11,6 +11,7 @@ interface VoteAdminControlsProps {
 export function VoteAdminControls({ voteId, status }: VoteAdminControlsProps) {
   const [isPending, startTransition] = useTransition();
   const [notifyMembers, setNotifyMembers] = useState(true);
+  const [resendResult, setResendResult] = useState<string | null>(null);
 
   function handleOpen() {
     if (!confirm("Open this vote for members to cast ballots?")) return;
@@ -24,6 +25,15 @@ export function VoteAdminControls({ voteId, status }: VoteAdminControlsProps) {
       return;
     startTransition(() => {
       closeVote(voteId, notifyMembers);
+    });
+  }
+
+  function handleResendNotification() {
+    if (!confirm("Resend the results email to all members?")) return;
+    setResendResult(null);
+    startTransition(async () => {
+      const result = await resendCloseNotification(voteId);
+      setResendResult(result);
     });
   }
 
@@ -52,7 +62,7 @@ export function VoteAdminControls({ voteId, status }: VoteAdminControlsProps) {
           Email all members when {status === "draft" ? "vote opens" : "vote closes"}
         </label>
       )}
-      <div className="flex gap-3">
+      <div className="flex flex-wrap gap-3">
         {status === "draft" && (
           <button
             onClick={handleOpen}
@@ -71,6 +81,15 @@ export function VoteAdminControls({ voteId, status }: VoteAdminControlsProps) {
             {isPending ? "Closing..." : "Close Vote"}
           </button>
         )}
+        {status === "closed" && (
+          <button
+            onClick={handleResendNotification}
+            disabled={isPending}
+            className="rounded-lg bg-brand-500 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-brand-700 disabled:opacity-50"
+          >
+            {isPending ? "Sending..." : "Resend Results Email"}
+          </button>
+        )}
         <button
           onClick={handleDelete}
           disabled={isPending}
@@ -79,6 +98,9 @@ export function VoteAdminControls({ voteId, status }: VoteAdminControlsProps) {
           {isPending ? "Deleting..." : "Delete Vote"}
         </button>
       </div>
+      {resendResult && (
+        <p className="text-sm text-green-600">{resendResult}</p>
+      )}
     </div>
   );
 }

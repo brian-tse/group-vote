@@ -145,6 +145,70 @@ export async function closeVote(voteId: string, notify: boolean = true): Promise
 }
 
 /**
+ * Resend the results notification email for a closed vote.
+ */
+export async function resendCloseNotification(voteId: string): Promise<string> {
+  const member = await requireAdmin();
+  const adminClient = createAdminClient();
+
+  const { data: vote, error: fetchError } = await adminClient
+    .from("votes")
+    .select("*")
+    .eq("id", voteId)
+    .single();
+
+  if (fetchError || !vote) {
+    throw new Error("Vote not found.");
+  }
+
+  const typedVote = vote as Vote;
+
+  if (!canAdminVote(member, typedVote.division_id)) {
+    throw new Error("You do not have permission to manage this vote.");
+  }
+
+  if (typedVote.status !== "closed") {
+    throw new Error("Can only resend notifications for closed votes.");
+  }
+
+  const votingMemberQuery = adminClient
+    .from("members")
+    .select("id")
+    .eq("active", true)
+    .eq("voting_member", true);
+
+  const [{ data: options }, { data: votingMembers }] = await Promise.all([
+    adminClient
+      .from("vote_options")
+      .select("*")
+      .eq("vote_id", voteId)
+      .order("display_order", { ascending: true }),
+    typedVote.division_id !== null
+      ? votingMemberQuery.eq("division_id", typedVote.division_id)
+      : votingMemberQuery,
+  ]);
+
+  const typedOptions = (options || []) as VoteOption[];
+  const votingMemberIds = (votingMembers || []).map((m: { id: string }) => m.id);
+
+  const result = await tallyVote(
+    typedVote,
+    typedOptions,
+    votingMemberIds.length,
+    votingMemberIds
+  );
+
+  await notifyResultsPublished(
+    voteId,
+    typedVote.title,
+    result,
+    typedVote.division_id
+  );
+
+  return "Results email sent successfully.";
+}
+
+/**
  * Delete a vote and all associated data (ballots, participation records).
  */
 export async function deleteVote(voteId: string): Promise<void> {
