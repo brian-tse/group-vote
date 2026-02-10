@@ -92,37 +92,38 @@ export async function sendEmail(params: SendEmailParams): Promise<void> {
 
 /**
  * Send the same email to multiple recipients (one email per recipient for privacy).
- * Sends in parallel batches of 10 to stay within API rate limits while avoiding
- * serverless function timeouts from serial sends.
- * Failures for individual recipients are logged but do not stop the batch.
+ * Uses Resend's batch API to send up to 100 emails in a single API call,
+ * avoiding serverless function timeouts from sequential sends.
  */
 export async function sendBulkEmail(
   recipients: string[],
   subject: string,
   bodyHtml: string
 ): Promise<{ sent: number; failed: number }> {
+  const resend = getResendClient();
+  const html = wrapInTemplate(bodyHtml);
+
+  const emails = recipients.map((to) => ({
+    from: FROM_ADDRESS,
+    to,
+    subject,
+    html,
+  }));
+
+  // Resend batch API supports up to 100 emails per call
+  const BATCH_SIZE = 100;
   let sent = 0;
   let failed = 0;
 
-  const BATCH_SIZE = 10;
+  for (let i = 0; i < emails.length; i += BATCH_SIZE) {
+    const batch = emails.slice(i, i + BATCH_SIZE);
+    const { data, error } = await resend.batch.send(batch);
 
-  for (let i = 0; i < recipients.length; i += BATCH_SIZE) {
-    const batch = recipients.slice(i, i + BATCH_SIZE);
-    const results = await Promise.allSettled(
-      batch.map((to) => sendEmail({ to, subject, bodyHtml }))
-    );
-
-    for (let j = 0; j < results.length; j++) {
-      if (results[j].status === "fulfilled") {
-        sent++;
-      } else {
-        const reason = (results[j] as PromiseRejectedResult).reason;
-        console.error(
-          `Email send failed for ${batch[j]}:`,
-          reason instanceof Error ? reason.message : reason
-        );
-        failed++;
-      }
+    if (error) {
+      console.error("Batch email send failed:", error.message);
+      failed += batch.length;
+    } else {
+      sent += data?.data?.length ?? batch.length;
     }
   }
 
