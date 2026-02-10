@@ -220,25 +220,11 @@ export async function resendCloseNotification(voteId: string): Promise<string> {
     shareholderParticipationCount
   );
 
-  // Exclude members who already received the email
-  const alreadySent = [
-    "tsb@acamedicalgroup.com",
-    "pn@acamedicalgroup.com",
-    "th@acamedicalgroup.com",
-    "vam@acamedicalgroup.com",
-    "tsh@acamedicalgroup.com",
-    "sb@acamedicalgroup.com",
-    "ariel@acamedicalgroup.com",
-    "phg@acamedicalgroup.com",
-    "phj@acamedicalgroup.com",
-  ];
-
   await notifyResultsPublished(
     voteId,
     typedVote.title,
     result,
-    typedVote.division_id,
-    alreadySent
+    typedVote.division_id
   );
 
   return "Results email sent successfully.";
