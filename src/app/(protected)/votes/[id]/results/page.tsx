@@ -77,8 +77,8 @@ export default async function ResultsPage({
     .eq("active", true)
     .eq("voting_member", true);
 
-  // Fetch options and member counts in parallel
-  const [{ data: options }, { count: activeMemberCount }, { data: votingMembers }] =
+  // Fetch options, member counts, and participation records in parallel
+  const [{ data: options }, { count: activeMemberCount }, { data: votingMembers }, { data: participationRecords }] =
     await Promise.all([
       adminClient
         .from("vote_options")
@@ -91,6 +91,11 @@ export default async function ResultsPage({
       voteDivisionId !== null
         ? votingMemberQuery.eq("division_id", voteDivisionId)
         : votingMemberQuery,
+      // Count voting shareholders who participated (for accurate quorum)
+      adminClient
+        .from("participation_records")
+        .select("member_id")
+        .eq("vote_id", id),
     ]);
 
   const typedOptions = (options || []) as VoteOption[];
@@ -98,16 +103,22 @@ export default async function ResultsPage({
   const votingMemberIds = (votingMembers || []).map((m: { id: string }) => m.id);
   const votingMemberCount = votingMemberIds.length;
   const hasNonVotingMembers = votingMemberCount < (activeMemberCount || 0);
-  const isAnonymous = typedVote.privacy_level === "anonymous";
+
+  // Count how many voting shareholders actually participated
+  const votingMemberIdSet = new Set(votingMemberIds);
+  const shareholderParticipationCount = (participationRecords || [])
+    .filter((p: { member_id: string }) => votingMemberIdSet.has(p.member_id))
+    .length;
 
   // Official tally: voting shareholders only (quorum based on voting members)
-  // For anonymous votes, passing votingMemberIds triggers filtering by the
-  // voting_member flag on ballot_records_anonymous instead of by member_id.
+  // participationCount ensures quorum is based on actual shareholder participation,
+  // not ballot count (which may differ for anonymous votes with non-shareholder voters).
   const result = await tallyVote(
     typedVote,
     typedOptions,
     votingMemberCount,
-    votingMemberIds
+    votingMemberIds,
+    shareholderParticipationCount
   );
 
   // All-members tally (only needed if there are non-voting members)
@@ -159,9 +170,7 @@ export default async function ResultsPage({
         <p className="mt-2 text-sm text-gray-600">{explanation}</p>
         {hasNonVotingMembers && (
           <p className="mt-2 text-xs text-gray-400">
-            {isAnonymous
-              ? "This is an anonymous vote — ballots cannot be separated by voting status."
-              : `Official tally based on ${votingMemberCount} voting shareholder${votingMemberCount !== 1 ? "s" : ""}.`}
+            Official tally based on {votingMemberCount} voting shareholder{votingMemberCount !== 1 ? "s" : ""}.
           </p>
         )}
       </div>

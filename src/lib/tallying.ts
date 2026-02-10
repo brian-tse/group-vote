@@ -231,7 +231,8 @@ export async function tallyYesNo(
   vote: Vote,
   options: VoteOption[],
   activeMemberCount: number,
-  votingMemberIds?: string[]
+  votingMemberIds?: string[],
+  participationCount?: number
 ): Promise<YesNoResult> {
   const ballots = await fetchBallots(vote.id, vote.privacy_level, votingMemberIds);
   const totalBallots = ballots.length;
@@ -258,10 +259,11 @@ export async function tallyYesNo(
   const sorted = [...counts].sort((a, b) => b.count - a.count);
   const winner = sorted[0]?.count > 0 ? sorted[0] : null;
 
-  // Quorum check
+  // Quorum check — use participationCount (from participation_records) if provided
+  const quorumNumerator = participationCount ?? totalBallots;
   const quorumRequired = vote.quorum_percentage / 100;
   const quorumActual =
-    activeMemberCount > 0 ? totalBallots / activeMemberCount : 0;
+    activeMemberCount > 0 ? quorumNumerator / activeMemberCount : 0;
   const meetsQuorum = quorumActual >= quorumRequired;
 
   // Threshold check — for yes/no, threshold applies to the "Yes" option
@@ -297,7 +299,8 @@ export async function tallyMultipleChoice(
   vote: Vote,
   options: VoteOption[],
   activeMemberCount: number,
-  votingMemberIds?: string[]
+  votingMemberIds?: string[],
+  participationCount?: number
 ): Promise<MultipleChoiceResult> {
   const ballots = await fetchBallots(vote.id, vote.privacy_level, votingMemberIds);
   const totalBallots = ballots.length;
@@ -325,9 +328,10 @@ export async function tallyMultipleChoice(
   const winner = sorted[0]?.count > 0 ? sorted[0] : null;
 
   // Quorum check
+  const quorumNumerator = participationCount ?? totalBallots;
   const quorumRequired = vote.quorum_percentage / 100;
   const quorumActual =
-    activeMemberCount > 0 ? totalBallots / activeMemberCount : 0;
+    activeMemberCount > 0 ? quorumNumerator / activeMemberCount : 0;
   const meetsQuorum = quorumActual >= quorumRequired;
 
   // Threshold check — winner's percentage of total ballots
@@ -374,7 +378,8 @@ export async function tallyRankedChoice(
   vote: Vote,
   options: VoteOption[],
   activeMemberCount: number,
-  votingMemberIds?: string[]
+  votingMemberIds?: string[],
+  participationCount?: number
 ): Promise<RankedChoiceResult> {
   const rawBallots = await fetchBallots(vote.id, vote.privacy_level, votingMemberIds);
   const totalBallots = rawBallots.length;
@@ -513,9 +518,10 @@ export async function tallyRankedChoice(
   }
 
   // Quorum check
+  const quorumNumerator = participationCount ?? totalBallots;
   const quorumRequired = vote.quorum_percentage / 100;
   const quorumActual =
-    activeMemberCount > 0 ? totalBallots / activeMemberCount : 0;
+    activeMemberCount > 0 ? quorumNumerator / activeMemberCount : 0;
   const meetsQuorum = quorumActual >= quorumRequired;
 
   // Threshold check — for ranked choice, the winner's final-round percentage
@@ -550,7 +556,8 @@ export async function tallyDatePoll(
   vote: Vote,
   options: VoteOption[],
   activeMemberCount: number,
-  votingMemberIds?: string[]
+  votingMemberIds?: string[],
+  participationCount?: number
 ): Promise<DatePollResult> {
   const ballots = await fetchBallots(vote.id, vote.privacy_level, votingMemberIds);
   const totalBallots = ballots.length;
@@ -592,9 +599,10 @@ export async function tallyDatePoll(
       : null;
 
   // Quorum check
+  const quorumNumerator = participationCount ?? totalBallots;
   const quorumRequired = vote.quorum_percentage / 100;
   const quorumActual =
-    activeMemberCount > 0 ? totalBallots / activeMemberCount : 0;
+    activeMemberCount > 0 ? quorumNumerator / activeMemberCount : 0;
   const meetsQuorum = quorumActual >= quorumRequired;
 
   // Threshold — winning date's yes-count / total ballots
@@ -629,7 +637,8 @@ export async function tallyApproval(
   vote: Vote,
   options: VoteOption[],
   activeMemberCount: number,
-  votingMemberIds?: string[]
+  votingMemberIds?: string[],
+  participationCount?: number
 ): Promise<ApprovalResult> {
   const ballots = await fetchBallots(vote.id, vote.privacy_level, votingMemberIds);
   const totalBallots = ballots.length;
@@ -659,9 +668,10 @@ export async function tallyApproval(
   const winner = sorted[0]?.count > 0 ? sorted[0] : null;
 
   // Quorum check
+  const quorumNumerator = participationCount ?? totalBallots;
   const quorumRequired = vote.quorum_percentage / 100;
   const quorumActual =
-    activeMemberCount > 0 ? totalBallots / activeMemberCount : 0;
+    activeMemberCount > 0 ? quorumNumerator / activeMemberCount : 0;
   const meetsQuorum = quorumActual >= quorumRequired;
 
   // Threshold — winner's approval_count / total_ballots
@@ -696,7 +706,8 @@ export async function tallyRsvp(
   vote: Vote,
   options: VoteOption[],
   activeMemberCount: number,
-  votingMemberIds?: string[]
+  votingMemberIds?: string[],
+  participationCount?: number
 ): Promise<RsvpResult> {
   const ballots = await fetchBallots(vote.id, vote.privacy_level, votingMemberIds);
   const totalBallots = ballots.length;
@@ -715,9 +726,10 @@ export async function tallyRsvp(
   }
 
   // Quorum check
+  const quorumNumerator = participationCount ?? totalBallots;
   const quorumRequired = vote.quorum_percentage / 100;
   const quorumActual =
-    activeMemberCount > 0 ? totalBallots / activeMemberCount : 0;
+    activeMemberCount > 0 ? quorumNumerator / activeMemberCount : 0;
   const meetsQuorum = quorumActual >= quorumRequired;
 
   // RSVP has no true pass/fail threshold — just check quorum
@@ -754,7 +766,8 @@ export async function tallyScoreRating(
   vote: Vote,
   options: VoteOption[],
   activeMemberCount: number,
-  votingMemberIds?: string[]
+  votingMemberIds?: string[],
+  participationCount?: number
 ): Promise<ScoreRatingResult> {
   const ballots = await fetchBallots(vote.id, vote.privacy_level, votingMemberIds);
   const totalBallots = ballots.length;
@@ -817,9 +830,10 @@ export async function tallyScoreRating(
       : null;
 
   // Quorum check
+  const quorumNumerator = participationCount ?? totalBallots;
   const quorumRequired = vote.quorum_percentage / 100;
   const quorumActual =
-    activeMemberCount > 0 ? totalBallots / activeMemberCount : 0;
+    activeMemberCount > 0 ? quorumNumerator / activeMemberCount : 0;
   const meetsQuorum = quorumActual >= quorumRequired;
 
   // Threshold — winner's average / 5 (max score) as a percentage
@@ -854,7 +868,8 @@ export async function tallyMultiSelect(
   vote: Vote,
   options: VoteOption[],
   activeMemberCount: number,
-  votingMemberIds?: string[]
+  votingMemberIds?: string[],
+  participationCount?: number
 ): Promise<MultiSelectResult> {
   const ballots = await fetchBallots(vote.id, vote.privacy_level, votingMemberIds);
   const totalBallots = ballots.length;
@@ -884,9 +899,10 @@ export async function tallyMultiSelect(
   const winner = sorted[0]?.count > 0 ? sorted[0] : null;
 
   // Quorum check
+  const quorumNumerator = participationCount ?? totalBallots;
   const quorumRequired = vote.quorum_percentage / 100;
   const quorumActual =
-    activeMemberCount > 0 ? totalBallots / activeMemberCount : 0;
+    activeMemberCount > 0 ? quorumNumerator / activeMemberCount : 0;
   const meetsQuorum = quorumActual >= quorumRequired;
 
   // Threshold — winner's selection count / total_ballots
@@ -924,25 +940,26 @@ export async function tallyVote(
   vote: Vote,
   options: VoteOption[],
   activeMemberCount: number,
-  votingMemberIds?: string[]
+  votingMemberIds?: string[],
+  participationCount?: number
 ): Promise<VoteResult> {
   switch (vote.format) {
     case "yes_no":
-      return tallyYesNo(vote, options, activeMemberCount, votingMemberIds);
+      return tallyYesNo(vote, options, activeMemberCount, votingMemberIds, participationCount);
     case "multiple_choice":
-      return tallyMultipleChoice(vote, options, activeMemberCount, votingMemberIds);
+      return tallyMultipleChoice(vote, options, activeMemberCount, votingMemberIds, participationCount);
     case "ranked_choice":
-      return tallyRankedChoice(vote, options, activeMemberCount, votingMemberIds);
+      return tallyRankedChoice(vote, options, activeMemberCount, votingMemberIds, participationCount);
     case "date_poll":
-      return tallyDatePoll(vote, options, activeMemberCount, votingMemberIds);
+      return tallyDatePoll(vote, options, activeMemberCount, votingMemberIds, participationCount);
     case "approval":
-      return tallyApproval(vote, options, activeMemberCount, votingMemberIds);
+      return tallyApproval(vote, options, activeMemberCount, votingMemberIds, participationCount);
     case "rsvp":
-      return tallyRsvp(vote, options, activeMemberCount, votingMemberIds);
+      return tallyRsvp(vote, options, activeMemberCount, votingMemberIds, participationCount);
     case "score_rating":
-      return tallyScoreRating(vote, options, activeMemberCount, votingMemberIds);
+      return tallyScoreRating(vote, options, activeMemberCount, votingMemberIds, participationCount);
     case "multi_select":
-      return tallyMultiSelect(vote, options, activeMemberCount, votingMemberIds);
+      return tallyMultiSelect(vote, options, activeMemberCount, votingMemberIds, participationCount);
     default:
       throw new Error(`Unsupported vote format: ${vote.format}`);
   }

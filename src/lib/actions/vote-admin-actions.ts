@@ -106,7 +106,7 @@ export async function closeVote(voteId: string, notify: boolean = true): Promise
         .eq("active", true)
         .eq("voting_member", true);
 
-      const [{ data: options }, { data: votingMembers }] = await Promise.all([
+      const [{ data: options }, { data: votingMembers }, { data: participationRecords }] = await Promise.all([
         adminClient
           .from("vote_options")
           .select("*")
@@ -115,17 +115,28 @@ export async function closeVote(voteId: string, notify: boolean = true): Promise
         typedVote.division_id !== null
           ? votingMemberQuery.eq("division_id", typedVote.division_id)
           : votingMemberQuery,
+        adminClient
+          .from("participation_records")
+          .select("member_id")
+          .eq("vote_id", voteId),
       ]);
 
       const typedOptions = (options || []) as VoteOption[];
       const votingMemberIds = (votingMembers || []).map((m: { id: string }) => m.id);
       const closedVote = { ...typedVote, status: "closed" as const } as Vote;
 
+      // Count voting shareholders who participated (for accurate quorum)
+      const votingMemberIdSet = new Set(votingMemberIds);
+      const shareholderParticipationCount = (participationRecords || [])
+        .filter((p: { member_id: string }) => votingMemberIdSet.has(p.member_id))
+        .length;
+
       const result = await tallyVote(
         closedVote,
         typedOptions,
         votingMemberIds.length,
-        votingMemberIds
+        votingMemberIds,
+        shareholderParticipationCount
       );
 
       await notifyResultsPublished(
@@ -177,7 +188,7 @@ export async function resendCloseNotification(voteId: string): Promise<string> {
     .eq("active", true)
     .eq("voting_member", true);
 
-  const [{ data: options }, { data: votingMembers }] = await Promise.all([
+  const [{ data: options }, { data: votingMembers }, { data: participationRecords }] = await Promise.all([
     adminClient
       .from("vote_options")
       .select("*")
@@ -186,16 +197,27 @@ export async function resendCloseNotification(voteId: string): Promise<string> {
     typedVote.division_id !== null
       ? votingMemberQuery.eq("division_id", typedVote.division_id)
       : votingMemberQuery,
+    adminClient
+      .from("participation_records")
+      .select("member_id")
+      .eq("vote_id", voteId),
   ]);
 
   const typedOptions = (options || []) as VoteOption[];
   const votingMemberIds = (votingMembers || []).map((m: { id: string }) => m.id);
 
+  // Count voting shareholders who participated (for accurate quorum)
+  const votingMemberIdSet = new Set(votingMemberIds);
+  const shareholderParticipationCount = (participationRecords || [])
+    .filter((p: { member_id: string }) => votingMemberIdSet.has(p.member_id))
+    .length;
+
   const result = await tallyVote(
     typedVote,
     typedOptions,
     votingMemberIds.length,
-    votingMemberIds
+    votingMemberIds,
+    shareholderParticipationCount
   );
 
   await notifyResultsPublished(
