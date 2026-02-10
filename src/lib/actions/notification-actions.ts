@@ -40,7 +40,8 @@ export async function notifyResultsPublished(
   voteId: string,
   voteTitle: string,
   result: VoteResult,
-  divisionId: string | null
+  divisionId: string | null,
+  excludeEmails?: string[]
 ): Promise<void> {
   const adminClient = createAdminClient();
 
@@ -57,7 +58,13 @@ export async function notifyResultsPublished(
 
   if (!members || members.length === 0) return;
 
-  const emails = members.map((m: { email: string }) => m.email);
+  let emails = members.map((m: { email: string }) => m.email);
+
+  if (excludeEmails && excludeEmails.length > 0) {
+    const excludeSet = new Set(excludeEmails.map((e) => e.toLowerCase()));
+    emails = emails.filter((e) => !excludeSet.has(e.toLowerCase()));
+  }
+
   const template = resultsPublishedEmail(voteTitle, voteId, result);
 
   await sendBulkEmail(emails, template.subject, template.bodyHtml);
