@@ -84,6 +84,7 @@ export async function castVote(input: CastVoteInput): Promise<VoteActionResult> 
       .insert({
         vote_id: input.voteId,
         choice: input.choice,
+        voting_member: member.voting_member,
       })
       .select("id")
       .single();
@@ -213,6 +214,7 @@ export async function changeVote(input: ChangeVoteInput): Promise<VoteActionResu
       .insert({
         vote_id: input.voteId,
         choice: input.choice,
+        voting_member: member.voting_member,
       })
       .select("id")
       .single();

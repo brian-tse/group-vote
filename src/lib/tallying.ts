@@ -192,11 +192,17 @@ async function fetchBallots(
   const adminClient = createAdminClient();
 
   if (privacyLevel === "anonymous") {
-    // Anonymous ballots can't be filtered by member — return all
-    const { data, error } = await adminClient
+    // When votingMemberIds is provided, filter to shareholder ballots only
+    const query = adminClient
       .from("ballot_records_anonymous")
       .select("choice")
       .eq("vote_id", voteId);
+
+    if (votingMemberIds) {
+      query.eq("voting_member", true);
+    }
+
+    const { data, error } = await query;
 
     if (error) throw new Error(`Failed to fetch ballots: ${error.message}`);
     return data || [];
