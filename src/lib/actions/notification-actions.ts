@@ -1,6 +1,7 @@
 import { createAdminClient } from "@/lib/supabase/admin";
 import { sendBulkEmail } from "@/lib/email";
 import { voteOpenedEmail, resultsPublishedEmail, reminderEmail } from "@/lib/email-templates";
+import type { VoteResult } from "@/lib/tallying";
 
 /**
  * Send "vote opened" email to members in the vote's division (or all for corp-wide).
@@ -38,7 +39,7 @@ export async function notifyVoteOpened(
 export async function notifyResultsPublished(
   voteId: string,
   voteTitle: string,
-  resultSummary: string,
+  result: VoteResult,
   divisionId: string | null
 ): Promise<void> {
   const adminClient = createAdminClient();
@@ -57,7 +58,7 @@ export async function notifyResultsPublished(
   if (!members || members.length === 0) return;
 
   const emails = members.map((m: { email: string }) => m.email);
-  const template = resultsPublishedEmail(voteTitle, voteId, resultSummary);
+  const template = resultsPublishedEmail(voteTitle, voteId, result);
 
   await sendBulkEmail(emails, template.subject, template.bodyHtml);
 }

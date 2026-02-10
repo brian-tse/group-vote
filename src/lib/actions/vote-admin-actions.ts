@@ -5,6 +5,9 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { notifyVoteOpened, notifyResultsPublished } from "./notification-actions";
+import { tallyVote, type VoteResult } from "@/lib/tallying";
+import { getResultStatus } from "@/lib/result-helpers";
+import type { Vote, VoteOption } from "@/lib/types";
 
 /**
  * Open a vote — changes status from draft to open and records the opened_at timestamp.
@@ -64,7 +67,7 @@ export async function closeVote(voteId: string, notify: boolean = true): Promise
 
   const { data: vote, error: fetchError } = await adminClient
     .from("votes")
-    .select("id, status, title, division_id")
+    .select("*")
     .eq("id", voteId)
     .single();
 
@@ -72,12 +75,14 @@ export async function closeVote(voteId: string, notify: boolean = true): Promise
     throw new Error("Vote not found.");
   }
 
-  if (!canAdminVote(member, vote.division_id)) {
+  const typedVote = vote as Vote;
+
+  if (!canAdminVote(member, typedVote.division_id)) {
     throw new Error("You do not have permission to manage this vote.");
   }
 
-  if (vote.status !== "open") {
-    throw new Error(`Cannot close a vote with status "${vote.status}".`);
+  if (typedVote.status !== "open") {
+    throw new Error(`Cannot close a vote with status "${typedVote.status}".`);
   }
 
   const { error } = await adminClient
@@ -92,14 +97,45 @@ export async function closeVote(voteId: string, notify: boolean = true): Promise
     throw new Error(`Failed to close vote: ${error.message}`);
   }
 
-  // Notify members in the vote's division that results are available (if requested)
+  // Compute results for the email
   if (notify) {
-    await notifyResultsPublished(
-      voteId,
-      vote.title,
-      "The vote has been closed and results are now available.",
-      vote.division_id
-    ).catch((err) =>
+    await (async () => {
+      const votingMemberQuery = adminClient
+        .from("members")
+        .select("id")
+        .eq("active", true)
+        .eq("voting_member", true);
+
+      const [{ data: options }, { data: votingMembers }] = await Promise.all([
+        adminClient
+          .from("vote_options")
+          .select("*")
+          .eq("vote_id", voteId)
+          .order("display_order", { ascending: true }),
+        typedVote.division_id !== null
+          ? votingMemberQuery.eq("division_id", typedVote.division_id)
+          : votingMemberQuery,
+      ]);
+
+      const typedOptions = (options || []) as VoteOption[];
+      const votingMemberIds = (votingMembers || []).map((m: { id: string }) => m.id);
+      const closedVote = { ...typedVote, status: "closed" as const } as Vote;
+      const isAnonymous = closedVote.privacy_level === "anonymous";
+
+      const result = await tallyVote(
+        closedVote,
+        typedOptions,
+        votingMemberIds.length,
+        isAnonymous ? undefined : votingMemberIds
+      );
+
+      await notifyResultsPublished(
+        voteId,
+        typedVote.title,
+        result,
+        typedVote.division_id
+      );
+    })().catch((err) =>
       console.error("Failed to send results published notifications:", err)
     );
   }
