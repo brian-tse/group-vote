@@ -86,6 +86,9 @@ const INITIAL_NEW: Member[] = [
   { abbr: "KOS", name: "Kosasih", ret: "full", start: "9/14/2026" },
   { abbr: "SON", name: "Sonderman", ret: "full", start: "10/5/2026" },
   { abbr: "MAR", name: "Evida Mars-Holt", ret: "full", start: "Sept 2026" },
+  { abbr: "N6", name: "New Member 6", ret: "full", start: "TBD" },
+  { abbr: "N7", name: "New Member 7", ret: "full", start: "TBD" },
+  { abbr: "N8", name: "New Member 8", ret: "full", start: "TBD" },
 ];
 
 // --- HELPERS ---
@@ -265,8 +268,8 @@ export default function CallBurdenPage() {
         <h2 className="text-lg font-semibold text-sky-400 mb-3">⚙️ Controls</h2>
 
         <div className="flex items-center gap-3 mb-3 flex-wrap">
-          <label className="text-sm min-w-[160px]">New Members (0–5):</label>
-          <input type="range" min={0} max={5} value={newCount}
+          <label className="text-sm min-w-[160px]">New Members (0–8):</label>
+          <input type="range" min={0} max={8} value={newCount}
             onChange={(e) => setNewCount(Number(e.target.value))}
             className="flex-1 min-w-[120px] accent-sky-400" />
           <span className="font-bold text-lg text-sky-400 min-w-[30px] text-center">{newCount}</span>
