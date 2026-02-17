@@ -539,6 +539,11 @@ Friday evening slots (P1 PM, OB PM) are${weekendCrew === 5 ? " filled by the wee
           <p><strong className="text-slate-200">Half Call:</strong> 0.5× call weight. <strong className="text-slate-200">No Call:</strong> excluded entirely.</p>
         </div>
       </section>
+
+      {/* ACKNOWLEDGEMENT */}
+      <p className="text-center text-xs text-slate-500 mt-2 mb-4">
+        Inspired by Ariel Angell. Built for ACAMG.
+      </p>
     </div>
   );
 }
